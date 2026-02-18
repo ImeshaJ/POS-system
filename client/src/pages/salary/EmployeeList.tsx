@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { ArrowUpRight, Briefcase, ClipboardCheck, Filter, Search, Sparkles, UserPlus, Users, Wallet } from "lucide-react"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 type Employee = {
   id: string
@@ -26,6 +28,7 @@ const DEPARTMENTS = ["HR", "Medical", "Surgery", "Pharmacy", "Reception", "Nursi
 const ROLES = ["Doctor", "Nurse", "Assistant", "Receptionist", "Manager", "Pharmacist", "Lab Technician", "Other"]
 
 export default function EmployeeList() {
+  const toast = useToast()
   const [employees, setEmployees] = useState<Employee[]>(() => {
     const saved = localStorage.getItem("employees")
     if (saved) {
@@ -42,6 +45,8 @@ export default function EmployeeList() {
   const [filterDepartment, setFilterDepartment] = useState("All")
   const [filterStatus, setFilterStatus] = useState("All")
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     name: "",
@@ -81,7 +86,7 @@ export default function EmployeeList() {
     e.preventDefault()
 
     if (!form.name || !form.email || !form.phone || !form.role || !form.department || !form.salary) {
-      alert("Please fill all required fields")
+      toast.warning("Please fill all required fields")
       return
     }
 
@@ -105,7 +110,7 @@ export default function EmployeeList() {
             : emp
         )
       )
-      alert("Employee updated successfully ✅")
+      toast.success("Employee updated successfully")
       setEditingId(null)
     } else {
       const newId = "EMP-" + String(employees.length + 1).padStart(3, "0")
@@ -125,7 +130,7 @@ export default function EmployeeList() {
       }
 
       setEmployees((prev) => [newEmployee, ...prev])
-      alert("Employee added successfully ✅")
+      toast.success("Employee added successfully")
     }
 
     resetForm()
@@ -163,10 +168,17 @@ export default function EmployeeList() {
     })
   }
 
-  function deleteEmployee(id: string) {
-    if (!confirm("Delete this employee?")) return
-    setEmployees((prev) => prev.filter((e) => e.id !== id))
-    alert("Employee deleted ✅")
+  function handleDeleteClick(id: string) {
+    setEmployeeToDelete(id)
+    setDeleteDialogOpen(true)
+  }
+
+  function handleDeleteConfirm() {
+    if (!employeeToDelete) return
+    setEmployees((prev) => prev.filter((e) => e.id !== employeeToDelete))
+    toast.success("Employee deleted successfully")
+    setDeleteDialogOpen(false)
+    setEmployeeToDelete(null)
   }
 
   function editEmployee(emp: Employee) {
@@ -190,7 +202,7 @@ export default function EmployeeList() {
     setEmployees((prev) =>
       prev.map((e) => (e.id === id ? { ...e, status } : e))
     )
-    alert("Status updated ✅")
+    toast.success("Status updated successfully")
   }
 
 
@@ -512,7 +524,7 @@ export default function EmployeeList() {
                             <Button size="sm" onClick={() => editEmployee(emp)} className="rounded-2xl bg-[#1d4ed8] px-4 text-xs text-white hover:bg-[#1e3a8a]">
                               Edit
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => deleteEmployee(emp.id)} className="rounded-2xl px-4 text-xs">
+                            <Button size="sm" variant="destructive" onClick={() => handleDeleteClick(emp.id)} className="rounded-2xl px-4 text-xs">
                               Delete
                             </Button>
                           </div>
@@ -553,6 +565,16 @@ export default function EmployeeList() {
           </CardContent>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Employee"
+        description="Are you sure you want to delete this employee? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={handleDeleteConfirm}
+        variant="destructive"
+      />
     </div>
   )
 }

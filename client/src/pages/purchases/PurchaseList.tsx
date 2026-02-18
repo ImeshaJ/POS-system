@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Package, ListFilter, TrendingUp, Download, ShieldCheck, AlertTriangle, Layers, RefreshCw, ShoppingBag, ArrowUpRight, Search, Loader2, Trash2 } from "lucide-react"
 import { apiDelete, apiGet, apiPatch } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 /* ================= TYPES ================= */
 
@@ -29,6 +31,8 @@ const LOW_STOCK_THRESHOLD = 10
 const QUICK_RESTOCK_INCREMENT = 5
 
 const PurchaseList = () => {
+  const toast = useToast()
+  const [deleteProductId, setDeleteProductId] = useState<number | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterCategory, setFilterCategory] = useState("")
   const [filterStatus, setFilterStatus] = useState("")
@@ -139,16 +143,22 @@ const PurchaseList = () => {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this product?")) return
+  const handleDeleteClick = (id: number) => {
+    setDeleteProductId(id)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteProductId) return
     try {
-      setDeletingId(id)
-      await apiDelete(`/api/products/${id}`)
-      setProducts(products.filter((p) => p.id !== id))
+      setDeletingId(deleteProductId)
+      await apiDelete(`/api/products/${deleteProductId}`)
+      setProducts(products.filter((p) => p.id !== deleteProductId))
+      toast.success("Product deleted successfully")
     } catch (err) {
-      setError("Failed to delete product")
+      toast.error("Failed to delete product")
     } finally {
       setDeletingId(null)
+      setDeleteProductId(null)
     }
   }
 
@@ -617,7 +627,7 @@ const PurchaseList = () => {
                           variant="destructive"
                           className="gap-2"
                           disabled={deletingId === product.id}
-                          onClick={() => handleDelete(product.id)}
+                          onClick={() => handleDeleteClick(product.id)}
                         >
                           {deletingId === product.id ? (
                             <>
@@ -648,6 +658,15 @@ const PurchaseList = () => {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={deleteProductId !== null}
+        onOpenChange={(open) => !open && setDeleteProductId(null)}
+        title="Delete Product"
+        description="Are you sure you want to delete this product? This action cannot be undone."
+        onConfirm={handleDeleteConfirm}
+        variant="danger"
+      />
     </>
   )
 }

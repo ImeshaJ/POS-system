@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Package, Truck } from "lucide-react"
 import { apiGet, apiPost } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
 
 /* ================= TYPES ================= */
 
@@ -35,6 +36,8 @@ const formatCurrency = (value: number) =>
 /* ================= COMPONENT ================= */
 
 export default function NewPurchase() {
+  const toast = useToast()
+
   /* ---------- STATE ---------- */
 
   const [supplier, setSupplier] = useState("")
@@ -142,7 +145,7 @@ export default function NewPurchase() {
     }
 
     if (!resolvedProductId) {
-      alert("Select a product from the list")
+      toast.warning("Select a product from the list")
       return
     }
 
@@ -170,7 +173,7 @@ export default function NewPurchase() {
 
   const savePurchase = async () => {
     if (!supplier || items.length === 0) {
-      alert("Supplier and items required")
+      toast.warning("Supplier and items required")
       return
     }
 
@@ -178,7 +181,7 @@ export default function NewPurchase() {
       setSaving(true)
       const resolvedSupplierId = supplierId || (await ensureSupplierId())
       if (!resolvedSupplierId) {
-        alert("Supplier is required")
+        toast.warning("Supplier is required")
         return
       }
 
@@ -198,10 +201,10 @@ export default function NewPurchase() {
       setProducts(refreshed.products)
       setSuppliers(refreshed.suppliers)
 
-      alert("Purchase saved")
+      toast.success("Purchase saved successfully")
       resetForm()
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to save purchase")
+      toast.error(err instanceof Error ? err.message : "Failed to save purchase")
     } finally {
       setSaving(false)
     }

@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { apiDelete, apiGet, apiPatch } from "@/lib/api"
 import { PawPrint, Heart, ShieldCheck, Ban, Search as SearchIcon, ListFilter } from "lucide-react"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 type ApiClient = {
   id: number
@@ -48,6 +50,9 @@ export default function PetsList() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [petToDelete, setPetToDelete] = useState<number | null>(null)
+  const toast = useToast()
 
   async function loadData() {
     setLoading(true)
@@ -152,19 +157,29 @@ export default function PetsList() {
         )
       )
       setIsEditing(false)
+      toast.success("Pet saved successfully")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to save pet")
+      toast.error(e instanceof Error ? e.message : "Failed to save pet")
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Delete this pet?")) return
+  const handleDeleteClick = (id: number) => {
+    setPetToDelete(id)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!petToDelete) return
     try {
-      await apiDelete(`/api/pets/${id}`)
-      setPets((prev) => prev.filter((p) => p.id !== id))
+      await apiDelete(`/api/pets/${petToDelete}`)
+      setPets((prev) => prev.filter((p) => p.id !== petToDelete))
       setSelectedPet(null)
+      toast.success("Pet deleted successfully")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to delete pet")
+      toast.error(e instanceof Error ? e.message : "Failed to delete pet")
+    } finally {
+      setDeleteDialogOpen(false)
+      setPetToDelete(null)
     }
   }
 
@@ -428,8 +443,8 @@ export default function PetsList() {
                 </>
               )}
 
-              <Button size="sm" variant="destructive" onClick={() => handleDelete(selectedPet.id)}>
-                🗑️ Delete
+              <Button size="sm" variant="destructive" onClick={() => handleDeleteClick(selectedPet.id)}>
+                Delete
               </Button>
             </div>
           </CardContent>
@@ -525,6 +540,16 @@ export default function PetsList() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Pet"
+        description="Are you sure you want to delete this pet? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={handleDeleteConfirm}
+        variant="destructive"
+      />
     </>
   )
 }

@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 import type { Attachment } from "@/lib/attachments"
 import {
   buildAttachmentDataUrl,
@@ -202,6 +204,7 @@ const SUMMARY_METRIC_CONFIG: Array<{
 
 export default function AppointmentListConsolidated() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [selected, setSelected] = useState<Appointment | null>(null)
   const [editingData, setEditingData] = useState<FormState>(createEmptyForm())
@@ -214,6 +217,8 @@ export default function AppointmentListConsolidated() {
   const [error, setError] = useState("")
   const [creating, setCreating] = useState(false)
   const [summary, setSummary] = useState<AppointmentSummary | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [appointmentToDelete, setAppointmentToDelete] = useState<string | null>(null)
   const groomingVisitActive = isGroomingReason(editingData.reason)
 
   const normalizeSummary = (payload?: AppointmentSummary | null) => {
@@ -288,7 +293,7 @@ export default function AppointmentListConsolidated() {
 
   async function saveChanges() {
     if (!editingData.client || !editingData.pet || !editingData.date || !editingData.time) {
-      alert("Please fill required fields")
+      toast.warning("Please fill required fields")
       return
     }
 
@@ -326,19 +331,29 @@ export default function AppointmentListConsolidated() {
       }
       await loadAppointments()
       closeModal()
+      toast.success("Appointment saved successfully")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to save appointment")
+      toast.error(e instanceof Error ? e.message : "Failed to save appointment")
     }
   }
 
-  async function deleteAppointment(id: string) {
-    if (!confirm("Delete this appointment?")) return
+  function handleDeleteClick(id: string) {
+    setAppointmentToDelete(id)
+    setDeleteDialogOpen(true)
+  }
+
+  async function handleDeleteConfirm() {
+    if (!appointmentToDelete) return
     try {
-      await apiDelete(`/api/appointments/${id}`)
+      await apiDelete(`/api/appointments/${appointmentToDelete}`)
       closeModal()
       await loadAppointments()
+      toast.success("Appointment deleted successfully")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to delete appointment")
+      toast.error(e instanceof Error ? e.message : "Failed to delete appointment")
+    } finally {
+      setDeleteDialogOpen(false)
+      setAppointmentToDelete(null)
     }
   }
 
@@ -364,7 +379,7 @@ export default function AppointmentListConsolidated() {
         attachments: [...(prev.attachments || []), ...uploads],
       }))
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to process attachments")
+      toast.error(err instanceof Error ? err.message : "Failed to process attachments")
     } finally {
       event.target.value = ""
     }
@@ -997,7 +1012,7 @@ export default function AppointmentListConsolidated() {
                     <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setEditMode(true)}>
                       Edit
                     </Button>
-                    <Button variant="destructive" onClick={() => deleteAppointment(selected!.id)}>
+                    <Button variant="destructive" onClick={() => handleDeleteClick(selected!.id)}>
                       Delete
                     </Button>
                   </>
@@ -1023,6 +1038,16 @@ export default function AppointmentListConsolidated() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Appointment"
+        description="Are you sure you want to delete this appointment? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={handleDeleteConfirm}
+        variant="destructive"
+      />
     </>
   )
 }

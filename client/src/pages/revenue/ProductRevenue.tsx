@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { ArrowUpRight, Filter, Package, Plus, Search, Sparkles, Tag, TrendingUp, Wallet } from "lucide-react"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 type Product = {
   id: string
@@ -85,6 +87,9 @@ const initialProducts: Product[] = [
 ]
 
 export default function ProductRevenue() {
+  const toast = useToast()
+  const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
+
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem("product_revenue")
     if (saved) {
@@ -158,7 +163,7 @@ export default function ProductRevenue() {
 
   function saveProduct() {
     if (!form.product || form.qty <= 0 || form.unitPrice <= 0) {
-      alert("Please fill all required fields")
+      toast.warning("Please fill all required fields")
       return
     }
 
@@ -192,13 +197,18 @@ export default function ProductRevenue() {
     }
 
     closeModal()
-    alert(editingProduct ? "Product updated ✅" : "Product added ✅")
+    toast.success(editingProduct ? "Product updated successfully" : "Product added successfully")
   }
 
-  function deleteProduct(id: string) {
-    if (!confirm("Delete this product?")) return
-    setProducts((prev) => prev.filter((p) => p.id !== id))
-    alert("Product deleted ✅")
+  function handleDeleteProductClick(id: string) {
+    setDeleteProductId(id)
+  }
+
+  function handleDeleteProductConfirm() {
+    if (!deleteProductId) return
+    setProducts((prev) => prev.filter((p) => p.id !== deleteProductId))
+    toast.success("Product deleted successfully")
+    setDeleteProductId(null)
   }
 
   function resetFilters() {
@@ -505,7 +515,7 @@ export default function ProductRevenue() {
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  onClick={() => deleteProduct(p.id)}
+                                  onClick={() => handleDeleteProductClick(p.id)}
                                   className="rounded-2xl px-4 text-xs"
                                 >
                                   Delete
@@ -640,6 +650,15 @@ export default function ProductRevenue() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteProductId !== null}
+        onOpenChange={(open) => !open && setDeleteProductId(null)}
+        title="Delete Product"
+        description="Are you sure you want to delete this product? This action cannot be undone."
+        onConfirm={handleDeleteProductConfirm}
+        variant="danger"
+      />
     </>
   )
 }

@@ -17,6 +17,8 @@ import {
   Trash2,
   Wallet,
 } from "lucide-react"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
+import { useToast } from "@/components/common/Toast"
 
 type SalaryStructureConfig = {
   id: string
@@ -107,6 +109,9 @@ export default function SalaryStructure() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [structureToDelete, setStructureToDelete] = useState<string | null>(null)
+  const toast = useToast()
 
   useEffect(() => {
     localStorage.setItem("salaryStructures", JSON.stringify(structures))
@@ -185,13 +190,18 @@ export default function SalaryStructure() {
     setShowForm(true)
   }
 
-  function handleDelete(id: string) {
-    if (!window.confirm("Delete this salary structure?")) {
-      return
-    }
-    const updated = structures.filter((structure) => structure.id !== id)
+  function openDeleteDialog(id: string) {
+    setStructureToDelete(id)
+    setDeleteDialogOpen(true)
+  }
+
+  function handleDelete() {
+    if (!structureToDelete) return
+    setDeleteDialogOpen(false)
+    const updated = structures.filter((structure) => structure.id !== structureToDelete)
     setStructures(updated)
-    alert("Salary structure deleted ✅")
+    toast.success("Salary structure deleted")
+    setStructureToDelete(null)
   }
 
   function resetForm() {
@@ -204,7 +214,7 @@ export default function SalaryStructure() {
     event.preventDefault()
 
     if (!formData.designation.trim() || formData.basicSalary <= 0) {
-      alert("Provide a designation and base salary before saving.")
+      toast.warning("Provide a designation and base salary before saving.")
       return
     }
 
@@ -220,7 +230,7 @@ export default function SalaryStructure() {
           : structure
       )
       setStructures(updated)
-      alert("Salary structure updated ✅")
+      toast.success("Salary structure updated")
     } else {
       const nextId =
         structures.length > 0
@@ -234,7 +244,7 @@ export default function SalaryStructure() {
         updatedAt: timestamp,
       }
       setStructures([newStructure, ...structures])
-      alert("Salary structure created ✅")
+      toast.success("Salary structure created")
     }
 
     resetForm()
@@ -784,7 +794,7 @@ export default function SalaryStructure() {
                               <Button size="icon" variant="outline" onClick={() => downloadStructurePDF(structure)} className="h-9 w-9 rounded-2xl border border-[#bbf7d0] text-[#15803d]">
                                 <Download className="h-4 w-4" />
                               </Button>
-                              <Button size="icon" variant="outline" onClick={() => handleDelete(structure.id)} className="h-9 w-9 rounded-2xl border border-[#fecdd3] text-[#b91c1c]">
+                              <Button size="icon" variant="outline" onClick={() => openDeleteDialog(structure.id)} className="h-9 w-9 rounded-2xl border border-[#fecdd3] text-[#b91c1c]">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -799,6 +809,16 @@ export default function SalaryStructure() {
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Salary Structure"
+        description="Are you sure you want to delete this salary structure? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

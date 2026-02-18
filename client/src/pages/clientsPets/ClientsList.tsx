@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api"
 import { Users, AlertTriangle, Wallet, ShieldCheck, Search as SearchIcon, Package } from "lucide-react"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 type ApiClient = {
   id: number
@@ -45,6 +47,8 @@ const getClientStatusBadge = (due: number) =>
   due > 0 ? "brand-pill bg-red-100 text-red-700" : "brand-pill bg-emerald-100 text-emerald-700"
 
 export default function ClientsList() {
+  const toast = useToast()
+  const [deleteClientId, setDeleteClientId] = useState<number | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -139,19 +143,27 @@ export default function ClientsList() {
         )
       )
       setIsEditing(false)
+      toast.success("Client saved successfully")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to save client")
+      toast.error(e instanceof Error ? e.message : "Failed to save client")
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Delete this client?")) return
+  const handleDeleteClick = (id: number) => {
+    setDeleteClientId(id)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (deleteClientId === null) return
     try {
-      await apiDelete(`/api/clients/${id}`)
-      setClients((prev) => prev.filter((c) => c.id !== id))
+      await apiDelete(`/api/clients/${deleteClientId}`)
+      setClients((prev) => prev.filter((c) => c.id !== deleteClientId))
       setSelectedClient(null)
+      toast.success("Client deleted successfully")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to delete client")
+      toast.error(e instanceof Error ? e.message : "Failed to delete client")
+    } finally {
+      setDeleteClientId(null)
     }
   }
 
@@ -389,7 +401,7 @@ export default function ClientsList() {
                                   prev ? { ...prev, pets: prev.pets.filter((p) => p.id !== pet.id) } : prev
                                 )
                               } catch (e) {
-                                alert(e instanceof Error ? e.message : "Failed to delete pet")
+                                toast.error(e instanceof Error ? e.message : "Failed to delete pet")
                               }
                             }}
                             className="text-red-500 hover:text-red-700 font-bold"
@@ -431,8 +443,9 @@ export default function ClientsList() {
                           })
                           setNewPetName("")
                           await loadData()
+                          toast.success("Pet added successfully")
                         } catch (e) {
-                          alert(e instanceof Error ? e.message : "Failed to add pet")
+                          toast.error(e instanceof Error ? e.message : "Failed to add pet")
                         }
                       }}
                     >
@@ -459,7 +472,7 @@ export default function ClientsList() {
                 </>
               )}
 
-              <Button size="sm" variant="destructive" onClick={() => handleDelete(selectedClient.id)}>
+              <Button size="sm" variant="destructive" onClick={() => handleDeleteClick(selectedClient.id)}>
                  Delete
               </Button>
             </div>
@@ -558,6 +571,15 @@ export default function ClientsList() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteClientId !== null}
+        onOpenChange={(open) => !open && setDeleteClientId(null)}
+        title="Delete Client"
+        description="Are you sure you want to delete this client? This action cannot be undone."
+        onConfirm={handleDeleteConfirm}
+        variant="danger"
+      />
     </>
   )
 }

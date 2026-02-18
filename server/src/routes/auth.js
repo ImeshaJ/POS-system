@@ -70,7 +70,7 @@ router.post('/login', async (req, res, next) => {
     }
 
     const result = await pool.query(
-      'SELECT id, email, username, password_hash, role FROM users WHERE email = $1 OR username = $1 LIMIT 1',
+      'SELECT id, email, username, password_hash, role FROM users WHERE LOWER(email) = $1 OR LOWER(username) = $1 LIMIT 1',
       [identifier.toLowerCase()]
     );
 

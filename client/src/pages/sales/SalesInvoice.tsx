@@ -2,10 +2,19 @@ import { useEffect, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Printer, Mail, ArrowLeft, MapPin, Phone, Mail as MailIcon } from "lucide-react"
-import { apiGet } from "@/lib/api"
+import { apiGet, apiPost } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
 
 /* ---------------- COMPANY ---------------- */
-const COMPANY = {
+type CompanyInfo = {
+  name: string
+  address: string
+  phone: string
+  email: string
+  logo: string
+}
+
+const DEFAULT_COMPANY: CompanyInfo = {
   name: "Furry Friends",
   address: "No4, Old Kesbewa Road, Gangodawila, Nugegoda",
   phone: "0704667700",
@@ -13,10 +22,41 @@ const COMPANY = {
   logo: "/src/assets/images/logo.png",
 }
 
+type ShopSettings = {
+  shopName: string
+  address: string
+  phone: string
+  email: string
+  vatNumber?: string
+}
+
 type SaleItem = {
   name: string
   price: number
   qty: number
+}
+
+type ApiSale = {
+  id: number
+  invoice_no?: string
+  date?: string
+  time?: string
+  client_id?: number
+  customer?: string
+  pet_name?: string
+  total?: number
+  subtotal?: number
+  vat?: number
+  discount?: number
+  payment_type?: string
+  status?: string
+}
+
+type ApiSaleItem = {
+  sale_id: number
+  name: string
+  price?: number
+  qty?: number
 }
 
 type Sale = {
@@ -45,9 +85,32 @@ export default function SalesInvoice() {
   const location = useLocation()
   const navigate = useNavigate()
   const { invoiceNo } = useParams()
+  const toast = useToast()
   const [sale, setSale] = useState<Sale | null>((location.state as Sale) || null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [company, setCompany] = useState<CompanyInfo>(DEFAULT_COMPANY)
+
+  // Fetch company info from settings API
+  useEffect(() => {
+    const loadCompanyInfo = async () => {
+      try {
+        const res = await apiGet<ShopSettings>("/api/settings/shop")
+        if (res.data) {
+          setCompany({
+            name: res.data.shopName || DEFAULT_COMPANY.name,
+            address: res.data.address || DEFAULT_COMPANY.address,
+            phone: res.data.phone || DEFAULT_COMPANY.phone,
+            email: res.data.email || DEFAULT_COMPANY.email,
+            logo: DEFAULT_COMPANY.logo,
+          })
+        }
+      } catch {
+        // Use defaults if API fails
+      }
+    }
+    loadCompanyInfo()
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -59,15 +122,15 @@ export default function SalesInvoice() {
         setError(null)
 
         const [salesRes, itemsRes] = await Promise.all([
-          apiGet<any[]>("/api/sales?limit=1000"),
-          apiGet<any[]>("/api/sale-items?limit=2000"),
+          apiGet<ApiSale[]>("/api/sales?limit=1000"),
+          apiGet<ApiSaleItem[]>("/api/sale-items?limit=2000"),
         ])
 
         const normalize = (value: string) => value.trim().toUpperCase().replace(/^INV-/, "")
         const input = normalize(invoiceNo)
 
         const sales = salesRes.data || []
-        const found = sales.find((s: any) => {
+        const found = sales.find((s) => {
           const candidate = s.invoice_no || `INV-${s.id}`
           return normalize(candidate) === input || String(s.id) === input
         })
@@ -78,8 +141,8 @@ export default function SalesInvoice() {
         }
 
         const items = (itemsRes.data || [])
-          .filter((i: any) => i.sale_id === found.id)
-          .map((i: any) => ({
+          .filter((i) => i.sale_id === found.id)
+          .map((i) => ({
             name: i.name,
             price: Number(i.price || 0),
             qty: Number(i.qty || 0),
@@ -163,21 +226,11 @@ export default function SalesInvoice() {
     if (!to) return
 
     try {
-      const response = await fetch("http://localhost:5000/api/invoices/email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, invoice: sale }),
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        alert(data?.message || "Email failed")
-        return
-      }
-      alert("Invoice sent to email")
+      await apiPost("/api/invoices/email", { to, invoice: sale })
+      toast.success("Invoice sent to email")
     } catch (error) {
       console.error("Email error:", error)
-      alert("Email failed")
+      toast.error(error instanceof Error ? error.message : "Email failed")
     }
   }
   const safeSubtotal = Number(sale.subtotal ?? sale.total ?? 0)
@@ -255,23 +308,23 @@ export default function SalesInvoice() {
         <div id="invoice-print" className="bg-white p-4 rounded-lg shadow-lg print:shadow-none print:p-0 print:rounded-none">
           <div className="grid grid-cols-2 gap-6 mb-4">
             <div className="flex items-start gap-3 min-w-0">
-              {COMPANY.logo && (
-                <img src={COMPANY.logo} alt="logo" className="h-12 w-12 object-contain shrink-0" />
+              {company.logo && (
+                <img src={company.logo} alt="logo" className="h-12 w-12 object-contain shrink-0" />
               )}
               <div className="min-w-0">
-                <h1 className="text-xl font-bold text-[#002366] wrap-break-word whitespace-normal">{COMPANY.name}</h1>
+                <h1 className="text-xl font-bold text-[#002366] wrap-break-word whitespace-normal">{company.name}</h1>
                 <div className="space-y-1 mt-2">
                   <div className="flex items-start gap-2">
                     <MapPin size={14} className="text-[#002366] shrink-0 mt-0.5" />
-                    <p className="text-xs text-gray-600 wrap-break-word">{COMPANY.address}</p>
+                    <p className="text-xs text-gray-600 wrap-break-word">{company.address}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone size={14} className="text-[#002366] shrink-0" />
-                    <p className="text-xs text-gray-600">{COMPANY.phone}</p>
+                    <p className="text-xs text-gray-600">{company.phone}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <MailIcon size={14} className="text-[#002366] shrink-0" />
-                    <p className="text-xs text-gray-600 wrap-break-word">{COMPANY.email}</p>
+                    <p className="text-xs text-gray-600 wrap-break-word">{company.email}</p>
                   </div>
                 </div>
               </div>
@@ -358,7 +411,7 @@ export default function SalesInvoice() {
 
           <div className="border-t border-[#002366] pt-2 text-center text-xs text-gray-600">
             <p className="mb-0.5">Thank you for your business!</p>
-            <p>Contact: {COMPANY.phone}</p>
+            <p>Contact: {company.phone}</p>
           </div>
         </div>
       </div>

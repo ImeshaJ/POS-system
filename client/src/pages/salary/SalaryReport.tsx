@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react"
+import { useToast } from "@/components/common/Toast"
 
 type Employee = {
   id: string
@@ -125,6 +126,7 @@ const normalizeDeductionLines = (value: unknown): DeductionLine[] => {
 }
 
 export default function SalaryReport() {
+  const toast = useToast()
   const initialMonth = monthStamp()
   const [employees] = useState<Employee[]>(() => {
     const saved = localStorage.getItem("employees")
@@ -297,12 +299,10 @@ export default function SalaryReport() {
     event.preventDefault()
 
     if (!form.employeeId || !form.employeeName || !form.baseSalary) {
-      alert("Select an employee and enter the base salary before saving.")
+      toast.warning("Select an employee and enter the base salary before saving")
       return
     }
 
-    const allowanceTotal = getAllowanceTotal(form.allowances)
-    const deductionTotal = getDeductionTotal(form.deductions)
     const netSalary = calculateNetSalary(form.baseSalary, form.allowances, form.deductions)
     const nextId = `SAL-${String(salaryRecords.length + 1).padStart(4, "0")}`
 
@@ -322,10 +322,8 @@ export default function SalaryReport() {
     }
 
     setSalaryRecords((prev) => [newRecord, ...prev])
-    alert(
-      `Payroll record for ${form.employeeName} saved. Net salary ${formatCurrency(netSalary)} (Allowance ${formatCurrency(
-        allowanceTotal
-      )} · Deduction ${formatCurrency(deductionTotal)}).`
+    toast.success(
+      `Payroll record for ${form.employeeName} saved. Net salary ${formatCurrency(netSalary)}`
     )
     setForm(createDefaultForm(form.month))
   }
@@ -346,7 +344,7 @@ export default function SalaryReport() {
 
   function exportToCSV() {
     if (!filteredRecords.length) {
-      alert("No records available for export.")
+      toast.warning("No records available for export")
       return
     }
 

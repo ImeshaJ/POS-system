@@ -25,6 +25,8 @@ import {
   X,
 } from "lucide-react"
 import { apiDelete, apiGet } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 interface TherapyPackage {
   id: number
@@ -148,6 +150,11 @@ const createDefaultDetail = (): SessionDetail => ({
 })
 
 export default function PhysiotherapyServices() {
+  const toast = useToast()
+  const [deletePackageId, setDeletePackageId] = useState<number | null>(null)
+  const [deleteServiceId, setDeleteServiceId] = useState<number | null>(null)
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null)
+
   const [packages, setPackages] = useState<TherapyPackage[]>([
     {
       id: 1,
@@ -373,7 +380,7 @@ export default function PhysiotherapyServices() {
 
   const savePackage = () => {
     if (!packageForm.name || !packageForm.price || !packageForm.description || !packageForm.duration || !packageForm.focus) {
-      alert("Please complete every package field")
+      toast.warning("Please complete every package field")
       return
     }
     if (editingPackage) {
@@ -386,7 +393,7 @@ export default function PhysiotherapyServices() {
 
   const saveService = () => {
     if (!serviceForm.name || !serviceForm.price || !serviceForm.description) {
-      alert("Please complete every add-on field")
+      toast.warning("Please complete every add-on field")
       return
     }
     if (editingService) {
@@ -401,14 +408,26 @@ export default function PhysiotherapyServices() {
     setPackages((prev) => prev.map((pkg) => (pkg.id === id ? { ...pkg, active: !pkg.active } : pkg)))
   }
 
-  const deletePackage = (id: number) => {
-    if (!confirm("Delete this protocol?")) return
-    setPackages((prev) => prev.filter((pkg) => pkg.id !== id))
+  const handleDeletePackageClick = (id: number) => {
+    setDeletePackageId(id)
   }
 
-  const deleteService = (id: number) => {
-    if (!confirm("Delete this add-on?")) return
-    setSupportServices((prev) => prev.filter((service) => service.id !== id))
+  const handleDeletePackageConfirm = () => {
+    if (deletePackageId === null) return
+    setPackages((prev) => prev.filter((pkg) => pkg.id !== deletePackageId))
+    toast.success("Protocol deleted successfully")
+    setDeletePackageId(null)
+  }
+
+  const handleDeleteServiceClick = (id: number) => {
+    setDeleteServiceId(id)
+  }
+
+  const handleDeleteServiceConfirm = () => {
+    if (deleteServiceId === null) return
+    setSupportServices((prev) => prev.filter((service) => service.id !== deleteServiceId))
+    toast.success("Add-on deleted successfully")
+    setDeleteServiceId(null)
   }
 
   const openSessionDetail = (session: TherapySession) => {
@@ -451,23 +470,29 @@ export default function PhysiotherapyServices() {
     }, 250)
   }
 
-  const handleDeleteSession = async (sessionId: string) => {
-    if (!confirm("Delete this session?")) return
-    setDeletePendingId(sessionId)
+  const handleDeleteSessionClick = (sessionId: string) => {
+    setDeleteSessionId(sessionId)
+  }
+
+  const handleDeleteSessionConfirm = async () => {
+    if (!deleteSessionId) return
+    setDeletePendingId(deleteSessionId)
     try {
-      await apiDelete(`/api/appointments/${sessionId}`)
-      setSessions((prev) => prev.filter((session) => session.id !== sessionId))
+      await apiDelete(`/api/appointments/${deleteSessionId}`)
+      setSessions((prev) => prev.filter((session) => session.id !== deleteSessionId))
       setSessionDetails((prev) => {
-        if (!prev[sessionId]) return prev
+        if (!prev[deleteSessionId]) return prev
         const next = { ...prev }
-        delete next[sessionId]
+        delete next[deleteSessionId]
         return next
       })
-      setSessionHistory((prev) => prev.filter((entry) => entry.sessionId !== sessionId))
+      setSessionHistory((prev) => prev.filter((entry) => entry.sessionId !== deleteSessionId))
+      toast.success("Session deleted successfully")
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to delete session")
+      toast.error(error instanceof Error ? error.message : "Failed to delete session")
     } finally {
       setDeletePendingId(null)
+      setDeleteSessionId(null)
     }
   }
 
@@ -689,7 +714,7 @@ export default function PhysiotherapyServices() {
                     <Button
                       size="icon"
                       variant="outline"
-                      onClick={() => deletePackage(pkg.id)}
+                      onClick={() => handleDeletePackageClick(pkg.id)}
                       className="h-9 w-9 rounded-2xl text-rose-600"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -738,7 +763,7 @@ export default function PhysiotherapyServices() {
                           <Button
                             size="icon"
                             variant="outline"
-                            onClick={() => deleteService(service.id)}
+                            onClick={() => handleDeleteServiceClick(service.id)}
                             className="h-9 w-9 rounded-2xl text-rose-600"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -830,7 +855,7 @@ export default function PhysiotherapyServices() {
                             variant="ghost"
                             className="rounded-2xl text-rose-600 hover:text-rose-700"
                             disabled={deletePendingId === session.id}
-                            onClick={() => handleDeleteSession(session.id)}
+                            onClick={() => handleDeleteSessionClick(session.id)}
                           >
                             {deletePendingId === session.id ? "Deleting…" : "Delete"}
                           </Button>
@@ -1188,6 +1213,33 @@ export default function PhysiotherapyServices() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deletePackageId !== null}
+        onOpenChange={(open) => !open && setDeletePackageId(null)}
+        title="Delete Protocol"
+        description="Are you sure you want to delete this physiotherapy protocol? This action cannot be undone."
+        onConfirm={handleDeletePackageConfirm}
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        open={deleteServiceId !== null}
+        onOpenChange={(open) => !open && setDeleteServiceId(null)}
+        title="Delete Add-on"
+        description="Are you sure you want to delete this add-on service? This action cannot be undone."
+        onConfirm={handleDeleteServiceConfirm}
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        open={deleteSessionId !== null}
+        onOpenChange={(open) => !open && setDeleteSessionId(null)}
+        title="Delete Session"
+        description="Are you sure you want to delete this therapy session? This action cannot be undone."
+        onConfirm={handleDeleteSessionConfirm}
+        variant="danger"
+      />
     </div>
   )
 }

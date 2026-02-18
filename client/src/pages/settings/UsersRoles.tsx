@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Users, Shield, Trash2, Edit2, Plus, AlertTriangle, UserCheck, RefreshCw, Filter, Search } from "lucide-react"
 import { apiDelete, apiGet, apiPatch } from "@/lib/api"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
+import { useToast } from "@/components/common/Toast"
 
 type Role = "admin" | "staff" | string
 type Status = "Active" | "Inactive"
@@ -48,6 +50,9 @@ export default function UsersRoles() {
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all")
   const [statusFilter, setStatusFilter] = useState<Status | "all">("all")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [userToDelete, setUserToDelete] = useState<number | null>(null)
+  const toast = useToast()
 
   const fetchUsers = useCallback(async () => {
     setLoading(true)
@@ -93,19 +98,25 @@ export default function UsersRoles() {
     }
   }
 
-  const handleDelete = async (userId: number) => {
-    if (!window.confirm("Delete this user? This action cannot be undone.")) {
-      return
-    }
-    setDeletingId(userId)
+  const openDeleteDialog = (userId: number) => {
+    setUserToDelete(userId)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDelete = async () => {
+    if (!userToDelete) return
+    setDeleteDialogOpen(false)
+    setDeletingId(userToDelete)
     setError(null)
     try {
-      await apiDelete(`/api/settings/users/${userId}`)
-      setUsers((prev) => prev.filter((u) => u.id !== userId))
+      await apiDelete(`/api/settings/users/${userToDelete}`)
+      setUsers((prev) => prev.filter((u) => u.id !== userToDelete))
+      toast.success("User deleted successfully")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to delete user")
+      toast.error(err instanceof Error ? err.message : "Unable to delete user")
     } finally {
       setDeletingId(null)
+      setUserToDelete(null)
     }
   }
 
@@ -412,7 +423,7 @@ export default function UsersRoles() {
                           <Button
                             variant="ghost"
                             className="gap-1 text-destructive hover:text-destructive/80"
-                            onClick={() => handleDelete(user.id)}
+                            onClick={() => openDeleteDialog(user.id)}
                             disabled={deletingId === user.id || updatingId === user.id}
                             title="Delete user"
                           >
@@ -471,6 +482,16 @@ export default function UsersRoles() {
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete User"
+        description="This action cannot be undone. The user will be permanently removed from the system."
+        confirmText="Delete"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

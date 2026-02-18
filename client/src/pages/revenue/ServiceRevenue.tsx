@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { apiGet } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 import {
   Activity,
   ArrowUpRight,
@@ -232,6 +234,9 @@ const initialServices: Service[] = [
 ]
 
 export default function ServiceRevenue() {
+  const toast = useToast()
+  const [deleteServiceId, setDeleteServiceId] = useState<string | null>(null)
+
   const [manualServices, setManualServices] = useState<Service[]>(() => {
     const saved = localStorage.getItem("service_revenue")
     if (saved) {
@@ -443,7 +448,7 @@ export default function ServiceRevenue() {
 
   function saveService() {
     if (!form.service || form.count <= 0 || form.pricePerUnit <= 0) {
-      alert("Please fill all required fields")
+      toast.warning("Please fill all required fields")
       return
     }
 
@@ -477,13 +482,18 @@ export default function ServiceRevenue() {
     }
 
     closeModal()
-    alert(editingService ? "Service updated ✅" : "Service added ✅")
+    toast.success(editingService ? "Service updated successfully" : "Service added successfully")
   }
 
-  function deleteService(id: string) {
-    if (!confirm("Delete this service?")) return
-    setManualServices((prev) => prev.filter((s) => s.id !== id))
-    alert("Service deleted ✅")
+  function handleDeleteServiceClick(id: string) {
+    setDeleteServiceId(id)
+  }
+
+  function handleDeleteServiceConfirm() {
+    if (!deleteServiceId) return
+    setManualServices((prev) => prev.filter((s) => s.id !== deleteServiceId))
+    toast.success("Service deleted successfully")
+    setDeleteServiceId(null)
   }
 
   function exportToCSV() {
@@ -853,7 +863,7 @@ export default function ServiceRevenue() {
                                   <Button
                                     size="sm"
                                     variant="destructive"
-                                    onClick={() => deleteService(s.id)}
+                                    onClick={() => handleDeleteServiceClick(s.id)}
                                     className="rounded-2xl px-4 text-xs"
                                   >
                                     Delete
@@ -992,6 +1002,15 @@ export default function ServiceRevenue() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteServiceId !== null}
+        onOpenChange={(open) => !open && setDeleteServiceId(null)}
+        title="Delete Service"
+        description="Are you sure you want to delete this service? This action cannot be undone."
+        onConfirm={handleDeleteServiceConfirm}
+        variant="danger"
+      />
     </>
   )
 }

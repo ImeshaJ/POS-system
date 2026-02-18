@@ -25,6 +25,7 @@ import {
   CalendarClock,
 } from "lucide-react"
 import { apiGet, apiPatch, apiPost } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
 
 type PaymentHistory = {
   date: string
@@ -69,6 +70,7 @@ type ApiSupplierDuePayment = {
 }
 
 export default function SupplierDueComponent() {
+  const toast = useToast()
   const [dues, setDues] = useState<SupplierDue[]>([])
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -231,7 +233,7 @@ export default function SupplierDueComponent() {
 
   async function savePayment() {
     if (!selected || payAmount <= 0 || payAmount > selected.dueAmount) {
-      alert("Please enter a valid payment amount")
+      toast.warning("Please enter a valid payment amount")
       return
     }
 
@@ -272,9 +274,9 @@ export default function SupplierDueComponent() {
       )
 
       closeModal()
-      alert("Payment recorded")
+      toast.success("Payment recorded")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to save payment")
+      toast.error(e instanceof Error ? e.message : "Failed to save payment")
     }
   }
 
@@ -349,9 +351,9 @@ export default function SupplierDueComponent() {
     try {
       await apiPost("/api/supplier-dues-sync/sync", {})
       await loadDues()
-      alert("Supplier dues synced from purchases")
+      toast.success("Supplier dues synced from purchases")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to sync dues")
+      toast.error(e instanceof Error ? e.message : "Failed to sync dues")
     }
   }
 
@@ -365,7 +367,7 @@ export default function SupplierDueComponent() {
 
   const createDue = async () => {
     if (!createSupplierId || !createTotal) {
-      alert("Supplier and Total Amount are required")
+      toast.warning("Supplier and Total Amount are required")
       return
     }
     const totalAmount = Number(createTotal) || 0
@@ -396,9 +398,9 @@ export default function SupplierDueComponent() {
       await loadDues()
       setShowCreate(false)
       resetCreateForm()
-      alert("Supplier due created")
+      toast.success("Supplier due created")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to create due")
+      toast.error(e instanceof Error ? e.message : "Failed to create due")
     }
   }
 

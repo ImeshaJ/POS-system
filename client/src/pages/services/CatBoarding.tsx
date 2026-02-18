@@ -25,6 +25,8 @@ import {
   FileText,
 } from "lucide-react"
 import { apiDelete, apiGet } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 interface BoardingPackage {
   id: number
@@ -150,6 +152,9 @@ const appointmentTimestamp = (appointment: BoardingAppointment) => {
 const formatNumber = (value: number) => value.toLocaleString("en-LK")
 
 export default function CatBoarding() {
+  const toast = useToast()
+  const [deleteBoardingId, setDeleteBoardingId] = useState<string | null>(null)
+
   const [packages, setPackages] = useState<BoardingPackage[]>([
     {
       id: 1,
@@ -335,22 +340,28 @@ export default function CatBoarding() {
     }, 200)
   }
 
-  const handleDeleteBoarding = async (appointmentId: string) => {
-    if (!confirm("Delete this boarding appointment?")) return
+  const handleDeleteBoardingClick = (appointmentId: string) => {
+    setDeleteBoardingId(appointmentId)
+  }
+
+  const handleDeleteBoardingConfirm = async () => {
+    if (!deleteBoardingId) return
     try {
-      setDeletePendingId(appointmentId)
-      await apiDelete(`/api/appointments/${appointmentId}`)
-      setAppointmentRecords((prev) => prev.filter((appt) => appt.id !== appointmentId))
+      setDeletePendingId(deleteBoardingId)
+      await apiDelete(`/api/appointments/${deleteBoardingId}`)
+      setAppointmentRecords((prev) => prev.filter((appt) => appt.id !== deleteBoardingId))
       setStayDetails((prev) => {
-        if (!prev[appointmentId]) return prev
+        if (!prev[deleteBoardingId]) return prev
         const updated = { ...prev }
-        delete updated[appointmentId]
+        delete updated[deleteBoardingId]
         return updated
       })
+      toast.success("Boarding appointment deleted successfully")
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete booking")
+      toast.error(err instanceof Error ? err.message : "Failed to delete booking")
     } finally {
       setDeletePendingId(null)
+      setDeleteBoardingId(null)
     }
   }
 
@@ -375,7 +386,7 @@ export default function CatBoarding() {
 
   const savePackage = () => {
     if (!formPackage.name || !formPackage.price || !formPackage.description || !formPackage.duration) {
-      alert("Please fill all fields")
+      toast.warning("Please fill all fields")
       return
     }
 
@@ -405,7 +416,7 @@ export default function CatBoarding() {
 
   const saveService = () => {
     if (!formService.name || !formService.price) {
-      alert("Please fill all fields")
+      toast.warning("Please fill all fields")
       return
     }
 
@@ -852,7 +863,7 @@ export default function CatBoarding() {
                             variant="ghost"
                             className="rounded-2xl text-rose-600 hover:text-rose-700"
                             disabled={deletePendingId === appt.id}
-                            onClick={() => handleDeleteBoarding(appt.id)}
+                            onClick={() => handleDeleteBoardingClick(appt.id)}
                           >
                             {deletePendingId === appt.id ? "Deleting…" : "Delete"}
                           </Button>
@@ -1230,6 +1241,15 @@ export default function CatBoarding() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteBoardingId !== null}
+        onOpenChange={(open) => !open && setDeleteBoardingId(null)}
+        title="Delete Boarding Appointment"
+        description="Are you sure you want to delete this boarding appointment? This action cannot be undone."
+        onConfirm={handleDeleteBoardingConfirm}
+        variant="danger"
+      />
     </div>
   )
 }

@@ -28,6 +28,8 @@ import {
   X,
 } from "lucide-react"
 import { apiDelete, apiGet } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 interface InpatientPackage {
   id: number
@@ -151,6 +153,11 @@ const createDefaultDetail = (): RoundsDetail => ({
 const formatNumber = (value: number) => value.toLocaleString("en-LK")
 
 export default function HospitalizationServices() {
+  const toast = useToast()
+  const [deletePackageId, setDeletePackageId] = useState<number | null>(null)
+  const [deleteServiceId, setDeleteServiceId] = useState<number | null>(null)
+  const [deleteCaseId, setDeleteCaseId] = useState<string | null>(null)
+
   const [packages, setPackages] = useState<InpatientPackage[]>([
     {
       id: 1,
@@ -377,7 +384,7 @@ export default function HospitalizationServices() {
 
   const savePackage = () => {
     if (!packageForm.name || !packageForm.price || !packageForm.description || !packageForm.lengthOfStay || !packageForm.wardLevel) {
-      alert("Please complete every package field")
+      toast.warning("Please complete every package field")
       return
     }
     if (editingPackage) {
@@ -390,7 +397,7 @@ export default function HospitalizationServices() {
 
   const saveService = () => {
     if (!serviceForm.name || !serviceForm.price || !serviceForm.description) {
-      alert("Please complete every add-on field")
+      toast.warning("Please complete every add-on field")
       return
     }
     if (editingService) {
@@ -405,14 +412,26 @@ export default function HospitalizationServices() {
     setPackages((prev) => prev.map((pkg) => (pkg.id === id ? { ...pkg, active: !pkg.active } : pkg)))
   }
 
-  const deletePackage = (id: number) => {
-    if (!confirm("Delete this bundle?")) return
-    setPackages((prev) => prev.filter((pkg) => pkg.id !== id))
+  const handleDeletePackageClick = (id: number) => {
+    setDeletePackageId(id)
   }
 
-  const deleteService = (id: number) => {
-    if (!confirm("Delete this add-on?")) return
-    setAddonServices((prev) => prev.filter((service) => service.id !== id))
+  const handleDeletePackageConfirm = () => {
+    if (deletePackageId === null) return
+    setPackages((prev) => prev.filter((pkg) => pkg.id !== deletePackageId))
+    toast.success("Bundle deleted successfully")
+    setDeletePackageId(null)
+  }
+
+  const handleDeleteServiceClick = (id: number) => {
+    setDeleteServiceId(id)
+  }
+
+  const handleDeleteServiceConfirm = () => {
+    if (deleteServiceId === null) return
+    setAddonServices((prev) => prev.filter((service) => service.id !== deleteServiceId))
+    toast.success("Add-on deleted successfully")
+    setDeleteServiceId(null)
   }
 
   const openCaseDetail = (inpatientCase: InpatientCase) => {
@@ -455,23 +474,29 @@ export default function HospitalizationServices() {
     }, 250)
   }
 
-  const handleDeleteCase = async (caseId: string) => {
-    if (!confirm("Delete this hospitalization?")) return
-    setDeletePendingId(caseId)
+  const handleDeleteCaseClick = (caseId: string) => {
+    setDeleteCaseId(caseId)
+  }
+
+  const handleDeleteCaseConfirm = async () => {
+    if (!deleteCaseId) return
+    setDeletePendingId(deleteCaseId)
     try {
-      await apiDelete(`/api/appointments/${caseId}`)
-      setCases((prev) => prev.filter((record) => record.id !== caseId))
+      await apiDelete(`/api/appointments/${deleteCaseId}`)
+      setCases((prev) => prev.filter((record) => record.id !== deleteCaseId))
       setCaseDetails((prev) => {
-        if (!prev[caseId]) return prev
+        if (!prev[deleteCaseId]) return prev
         const copy = { ...prev }
-        delete copy[caseId]
+        delete copy[deleteCaseId]
         return copy
       })
-      setRoundsHistory((prev) => prev.filter((entry) => entry.caseId !== caseId))
+      setRoundsHistory((prev) => prev.filter((entry) => entry.caseId !== deleteCaseId))
+      toast.success("Hospitalization deleted successfully")
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to delete hospitalization")
+      toast.error(error instanceof Error ? error.message : "Failed to delete hospitalization")
     } finally {
       setDeletePendingId(null)
+      setDeleteCaseId(null)
     }
   }
 
@@ -695,7 +720,7 @@ export default function HospitalizationServices() {
                     <Button
                       size="icon"
                       variant="outline"
-                      onClick={() => deletePackage(pkg.id)}
+                      onClick={() => handleDeletePackageClick(pkg.id)}
                       className="h-9 w-9 rounded-2xl text-rose-600"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -744,7 +769,7 @@ export default function HospitalizationServices() {
                           <Button
                             size="icon"
                             variant="outline"
-                            onClick={() => deleteService(service.id)}
+                            onClick={() => handleDeleteServiceClick(service.id)}
                             className="h-9 w-9 rounded-2xl text-rose-600"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -837,7 +862,7 @@ export default function HospitalizationServices() {
                             variant="ghost"
                             className="rounded-2xl text-rose-600 hover:text-rose-700"
                             disabled={deletePendingId === record.id}
-                            onClick={() => handleDeleteCase(record.id)}
+                            onClick={() => handleDeleteCaseClick(record.id)}
                           >
                             {deletePendingId === record.id ? "Deleting…" : "Delete"}
                           </Button>
@@ -1195,6 +1220,33 @@ export default function HospitalizationServices() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deletePackageId !== null}
+        onOpenChange={(open) => !open && setDeletePackageId(null)}
+        title="Delete Bundle"
+        description="Are you sure you want to delete this hospitalization bundle? This action cannot be undone."
+        onConfirm={handleDeletePackageConfirm}
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        open={deleteServiceId !== null}
+        onOpenChange={(open) => !open && setDeleteServiceId(null)}
+        title="Delete Add-on"
+        description="Are you sure you want to delete this add-on service? This action cannot be undone."
+        onConfirm={handleDeleteServiceConfirm}
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        open={deleteCaseId !== null}
+        onOpenChange={(open) => !open && setDeleteCaseId(null)}
+        title="Delete Hospitalization"
+        description="Are you sure you want to delete this hospitalization record? This action cannot be undone."
+        onConfirm={handleDeleteCaseConfirm}
+        variant="danger"
+      />
     </div>
   )
 }

@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ArrowDownRight, CreditCard, Eye, Printer, ReceiptText, RotateCcw, TrendingUp, Trash2 } from "lucide-react"
 import { apiDelete, apiGet } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 /* ========= TYPES ========= */
 
@@ -81,6 +83,9 @@ const getChronoValue = (date?: string | null, time?: string | null) => {
 
 export default function SalesList() {
   const navigate = useNavigate()
+  const toast = useToast()
+  const [deleteSaleId, setDeleteSaleId] = useState<number | null>(null)
+  const [deleteSaleName, setDeleteSaleName] = useState<string>("")
   const [search, setSearch] = useState("")
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
   const [statusFilter, setStatusFilter] = useState<"All" | "Completed" | "Returned" | "Partially Returned">("All")
@@ -237,23 +242,29 @@ export default function SalesList() {
     setStatusFilter("All")
   }
 
-  const handleDeleteSale = async (sale: Sale) => {
+  const handleDeleteSaleClick = (sale: Sale) => {
     if (!sale.saleId || sale.isReturn) return
-    const confirmed = confirm(`Delete sale ${sale.id}? This action cannot be undone.`)
-    if (!confirmed) return
+    setDeleteSaleId(sale.saleId)
+    setDeleteSaleName(sale.id)
+  }
 
+  const handleDeleteSaleConfirm = async () => {
+    if (!deleteSaleId) return
     try {
-      setDeletingId(sale.saleId)
+      setDeletingId(deleteSaleId)
       setError(null)
-      await apiDelete(`/api/sales/${sale.saleId}`)
-      setSales((prev) => prev.filter((item) => item.saleId !== sale.saleId))
-      if (selectedSale?.saleId === sale.saleId) {
+      await apiDelete(`/api/sales/${deleteSaleId}`)
+      setSales((prev) => prev.filter((item) => item.saleId !== deleteSaleId))
+      if (selectedSale?.saleId === deleteSaleId) {
         setSelectedSale(null)
       }
+      toast.success("Sale deleted successfully")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete sale")
+      toast.error(err instanceof Error ? err.message : "Failed to delete sale")
     } finally {
       setDeletingId(null)
+      setDeleteSaleId(null)
+      setDeleteSaleName("")
     }
   }
   
@@ -508,7 +519,7 @@ export default function SalesList() {
                             variant="ghost"
                             size="sm"
                             className="text-red-600 hover:bg-red-50"
-                            onClick={() => handleDeleteSale(sale)}
+                            onClick={() => handleDeleteSaleClick(sale)}
                             disabled={deletingId === sale.saleId}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -635,7 +646,7 @@ export default function SalesList() {
                 {!selectedSale.isReturn && selectedSale.saleId && (
                   <Button
                     className="bg-red-600 text-white hover:bg-red-700"
-                    onClick={() => handleDeleteSale(selectedSale)}
+                    onClick={() => handleDeleteSaleClick(selectedSale)}
                     disabled={deletingId === selectedSale.saleId}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
@@ -647,6 +658,15 @@ export default function SalesList() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteSaleId !== null}
+        onOpenChange={(open) => !open && (setDeleteSaleId(null), setDeleteSaleName(""))}
+        title="Delete Sale"
+        description={`Are you sure you want to delete sale ${deleteSaleName}? This action cannot be undone.`}
+        onConfirm={handleDeleteSaleConfirm}
+        variant="danger"
+      />
     </>
   )
 }

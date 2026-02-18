@@ -23,6 +23,8 @@ import {
   X,
 } from "lucide-react"
 import { apiDelete, apiGet } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 interface SurgeryPackage {
   id: number
@@ -125,6 +127,9 @@ const timestampFromCase = (surgeryCase: SurgeryCase) => {
 }
 
 export default function SurgeryServices() {
+  const toast = useToast()
+  const [deleteCaseId, setDeleteCaseId] = useState<string | null>(null)
+
   const [packages, setPackages] = useState<SurgeryPackage[]>([
     {
       id: 1,
@@ -318,7 +323,7 @@ export default function SurgeryServices() {
 
   const savePackage = () => {
     if (!packageForm.name || !packageForm.priceRange || !packageForm.description || !packageForm.length) {
-      alert("Please complete all package fields")
+      toast.warning("Please complete all package fields")
       return
     }
     if (editingPackage) {
@@ -331,7 +336,7 @@ export default function SurgeryServices() {
 
   const saveAddon = () => {
     if (!addonForm.name || !addonForm.price) {
-      alert("Please complete all add-on fields")
+      toast.warning("Please complete all add-on fields")
       return
     }
     if (editingAddon) {
@@ -342,19 +347,26 @@ export default function SurgeryServices() {
     setShowAddonModal(false)
   }
 
-  const handleDeleteCase = async (caseId: string) => {
-    if (!confirm("Delete this surgery case?")) return
+  const handleDeleteCaseClick = (caseId: string) => {
+    setDeleteCaseId(caseId)
+  }
+
+  const handleDeleteCaseConfirm = async () => {
+    if (!deleteCaseId) return
     try {
-      await apiDelete(`/api/appointments/${caseId}`)
-      setAppointmentRecords((prev) => prev.filter((record) => record.id !== caseId))
+      await apiDelete(`/api/appointments/${deleteCaseId}`)
+      setAppointmentRecords((prev) => prev.filter((record) => record.id !== deleteCaseId))
       setCaseDetails((prev) => {
-        if (!prev[caseId]) return prev
+        if (!prev[deleteCaseId]) return prev
         const updated = { ...prev }
-        delete updated[caseId]
+        delete updated[deleteCaseId]
         return updated
       })
+      toast.success("Surgery case deleted successfully")
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete case")
+      toast.error(err instanceof Error ? err.message : "Failed to delete case")
+    } finally {
+      setDeleteCaseId(null)
     }
   }
 
@@ -624,7 +636,7 @@ export default function SurgeryServices() {
                       <Button size="sm" variant="ghost" onClick={() => openCaseDetail(record)}>
                         <Stethoscope className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => handleDeleteCase(record.id)}>
+                      <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => handleDeleteCaseClick(record.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
@@ -797,6 +809,15 @@ export default function SurgeryServices() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteCaseId !== null}
+        onOpenChange={(open) => !open && setDeleteCaseId(null)}
+        title="Delete Surgery Case"
+        description="Are you sure you want to delete this surgery case? This action cannot be undone."
+        onConfirm={handleDeleteCaseConfirm}
+        variant="danger"
+      />
     </div>
   )
 }

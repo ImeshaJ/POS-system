@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react"
 import { apiGet } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
 
 interface GroomingPackage {
   id: number
@@ -108,6 +109,8 @@ const appointmentTimestamp = (appointment: GroomingAppointment) => {
 const formatNumber = (value: number) => value.toLocaleString("en-LK")
 
 export default function PetGrooming() {
+  const toast = useToast()
+
   const [packages, setPackages] = useState<GroomingPackage[]>([
     {
       id: 1,
@@ -251,7 +254,7 @@ export default function PetGrooming() {
 
   const savePackage = () => {
     if (!formPackage.name || !formPackage.price || !formPackage.description || !formPackage.duration) {
-      alert("Please fill all fields")
+      toast.warning("Please fill all fields")
       return
     }
     if (editingPackage) {
@@ -280,7 +283,7 @@ export default function PetGrooming() {
 
   const saveService = () => {
     if (!formService.name || !formService.price) {
-      alert("Please fill all fields")
+      toast.warning("Please fill all fields")
       return
     }
     if (editingService) {

@@ -18,6 +18,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react"
+import { useToast } from "@/components/common/Toast"
 
 type Status = "Scheduled" | "Completed" | "Cancelled" | "No-Show"
 
@@ -101,6 +102,7 @@ const normalizeDateString = (value?: string | null) => {
 }
 
 export default function AppointmentCalendar() {
+  const toast = useToast()
   const today = new Date()
 
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -284,10 +286,11 @@ export default function AppointmentCalendar() {
         ])
       }
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to save appointment")
+      toast.error(e instanceof Error ? e.message : "Failed to save appointment")
       return
     }
 
+    toast.success(editingId ? "Appointment updated successfully" : "Appointment created successfully")
     setSelectedDate(form.date)
     await loadAppointments()
     resetForm()
@@ -314,8 +317,9 @@ export default function AppointmentCalendar() {
     try {
       await apiDelete(`/api/appointments/${id}`)
       setAppointments((prev) => prev.filter((a) => a.id !== id))
+      toast.success("Appointment deleted successfully")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to delete appointment")
+      toast.error(e instanceof Error ? e.message : "Failed to delete appointment")
     }
   }
 

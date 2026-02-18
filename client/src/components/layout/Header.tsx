@@ -1,14 +1,25 @@
 import { LogOut, Bell } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/lib/authContext"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
+import { useState } from "react"
 
 const Header = () => {
   const navigate = useNavigate()
   const { user, clearAuth } = useAuth()
+  const toast = useToast()
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   // Prevent rendering if user is not loaded yet
   if (!user) {
     return null
+  }
+
+  const handleLogoutConfirm = () => {
+    clearAuth()
+    navigate('/login')
+    setLogoutDialogOpen(false)
   }
 
   const initial = (user.username || user.email || "U").charAt(0).toUpperCase()
@@ -22,7 +33,7 @@ const Header = () => {
         {/* Notifications */}
         <button
           className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-          onClick={() => alert("Notifications coming soon")}
+          onClick={() => toast.info("Notifications coming soon")}
           title="Notifications"
         >
           <Bell size={20} />
@@ -55,13 +66,8 @@ const Header = () => {
 
         {/* Logout */}
         <button
-          onClick={() => {
-            if (confirm('Log out?')) {
-              clearAuth()
-              navigate('/login')
-            }
-          }}
-          className="hidden sm:flex items-center gap-2 h-10 px-3 rounded-lg 
+          onClick={() => setLogoutDialogOpen(true)}
+          className="hidden sm:flex items-center gap-2 h-10 px-3 rounded-lg
                      text-sm font-medium text-red-600 hover:bg-red-50
                      transition-all duration-200"
           title="Logout"
@@ -70,6 +76,15 @@ const Header = () => {
         </button>
       </div>
 
+      <ConfirmDialog
+        open={logoutDialogOpen}
+        onOpenChange={setLogoutDialogOpen}
+        title="Log out"
+        description="Are you sure you want to log out?"
+        onConfirm={handleLogoutConfirm}
+        variant="danger"
+        confirmText="Log out"
+      />
     </header>
   )
 }

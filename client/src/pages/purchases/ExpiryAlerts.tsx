@@ -6,6 +6,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Package, AlertTriangle, Clock, TrendingUp, ShoppingBag, ListFilter, RefreshCw, Search, Trash2, ArrowUpRight } from "lucide-react"
+import { apiGet, apiPatch } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
+
+type ApiProduct = {
+  id: number
+  code?: string
+  name: string
+  category?: string
+  expiry_date?: string
+  quantity?: number
+  status?: string
+}
 
 interface Product {
   id: string
@@ -25,8 +38,11 @@ export default function ExpiryAlerts() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatus, setFilterStatus] = useState("All")
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards")
-  const [products] = useState<Product[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [disposeDialogOpen, setDisposeDialogOpen] = useState(false)
+  const [productToDispose, setProductToDispose] = useState<Product | null>(null)
+  const toast = useToast()
 
   const statusFilters = ["Expired", "Critical", "Warning", "Good"]
 
@@ -54,10 +70,51 @@ export default function ExpiryAlerts() {
   const soonestExpiry = products.length > 0 ? products.reduce((min, p) => (p.daysLeft < min.daysLeft ? p : min)) : null
   const expiredPercentage = totalTracked > 0 ? (expiredCount / totalTracked) * 100 : 0
 
+  const calculateDaysLeft = (expiryDate: string | null | undefined): number => {
+    if (!expiryDate) return 999
+    const expiry = new Date(expiryDate)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    expiry.setHours(0, 0, 0, 0)
+    const diffTime = expiry.getTime() - today.getTime()
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  }
+
+  const determineStatus = (expiryDate: string | null | undefined, quantity: number | undefined): Product["status"] => {
+    if (!expiryDate || !quantity || quantity <= 0) return "Good"
+    const daysLeft = calculateDaysLeft(expiryDate)
+    if (daysLeft < 0) return "Expired"
+    if (daysLeft <= 7) return "Critical"
+    if (daysLeft <= 30) return "Warning"
+    return "Good"
+  }
+
   const loadInventory = async () => {
     setLoading(true)
+    setError(null)
     try {
-      // TODO: Fetch from API
+      const res = await apiGet<ApiProduct[]>("/api/products?limit=1000")
+      const apiProducts = res.data || []
+
+      // Filter products that have expiry dates
+      const productsWithExpiry = apiProducts
+        .filter(p => p.expiry_date && p.quantity && p.quantity > 0)
+        .map(p => {
+          const daysLeft = calculateDaysLeft(p.expiry_date)
+          return {
+            id: String(p.id),
+            name: p.name,
+            code: p.code || "",
+            category: p.category || "Uncategorized",
+            expiryDate: p.expiry_date || "",
+            stock: Number(p.quantity || 0),
+            daysLeft,
+            status: determineStatus(p.expiry_date, p.quantity)
+          }
+        })
+        .sort((a, b) => a.daysLeft - b.daysLeft)
+
+      setProducts(productsWithExpiry)
       setLastUpdated(new Date())
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load inventory")
@@ -67,16 +124,33 @@ export default function ExpiryAlerts() {
   }
 
   const handleSell = () => {
-    navigate("/sales")
+    navigate("/sales/new")
   }
 
   const handleRestock = () => {
-    navigate("/purchases")
+    navigate("/purchases/new")
   }
 
-  const handleDispose = (product: Product) => {
-    // TODO: Implement disposal logic
-    console.log("Dispose:", product)
+  const openDisposeDialog = (product: Product) => {
+    setProductToDispose(product)
+    setDisposeDialogOpen(true)
+  }
+
+  const handleDispose = async () => {
+    if (!productToDispose) return
+    setDisposeDialogOpen(false)
+    try {
+      await apiPatch(`/api/products/${productToDispose.id}`, {
+        status: "Disposed",
+        quantity: 0
+      })
+      toast.success(`${productToDispose.name} marked as disposed`)
+      loadInventory()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to dispose product")
+    } finally {
+      setProductToDispose(null)
+    }
   }
 
   const formatDateLabel = (date: string) => {
@@ -393,7 +467,7 @@ export default function ExpiryAlerts() {
 
                         <div className="mt-4 flex flex-wrap gap-2">
                           {product.status === "Expired" ? (
-                            <Button size="sm" variant="destructive" className="gap-2" onClick={() => handleDispose(product)}>
+                            <Button size="sm" variant="destructive" className="gap-2" onClick={() => openDisposeDialog(product)}>
                               <Trash2 className="h-4 w-4" /> Dispose Stock
                             </Button>
                           ) : (
@@ -453,7 +527,7 @@ export default function ExpiryAlerts() {
                             </td>
                             <td className="px-4 py-3 text-center">
                               {product.status === "Expired" ? (
-                                <Button size="sm" variant="destructive" className="gap-2" onClick={() => handleDispose(product)}>
+                                <Button size="sm" variant="destructive" className="gap-2" onClick={() => openDisposeDialog(product)}>
                                   <Trash2 className="h-4 w-4" /> Dispose
                                 </Button>
                               ) : (
@@ -473,6 +547,16 @@ export default function ExpiryAlerts() {
           </Card>
         )}
       </div>
+
+      <ConfirmDialog
+        open={disposeDialogOpen}
+        onOpenChange={setDisposeDialogOpen}
+        title="Dispose Product"
+        description={`Are you sure you want to dispose "${productToDispose?.name}"? This will set the stock to 0 and mark it as disposed.`}
+        confirmText="Dispose"
+        variant="destructive"
+        onConfirm={handleDispose}
+      />
     </>
   )
 }

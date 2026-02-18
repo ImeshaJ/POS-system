@@ -23,6 +23,8 @@ import {
   Filter,
 } from "lucide-react"
 import { apiDelete, apiGet, apiPatch } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 import type { Attachment } from "@/lib/attachments"
 import {
   buildAttachmentDataUrl,
@@ -166,6 +168,7 @@ const getStatusColor = (status: Status) => {
 }
 
 export default function MedicalHistory() {
+  const toast = useToast()
   const [records, setRecords] = useState<MedicalRecord[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
@@ -178,6 +181,7 @@ export default function MedicalHistory() {
   const [formState, setFormState] = useState<EditFormState | null>(null)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteRecordId, setDeleteRecordId] = useState<string | null>(null)
   const [searchParams] = useSearchParams()
 
   const highlightedId = searchParams.get("appointmentId")
@@ -244,7 +248,7 @@ export default function MedicalHistory() {
       const uploads = await Promise.all(Array.from(files).map((file) => readFileAsAttachment(file)))
       setFormState((prev) => (prev ? { ...prev, attachments: [...prev.attachments, ...uploads] } : prev))
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to process attachments")
+      toast.error(err instanceof Error ? err.message : "Failed to process attachments")
     } finally {
       event.target.value = ""
     }
@@ -282,29 +286,36 @@ export default function MedicalHistory() {
       setExpandedId(updated.id)
       setEditingId(null)
       setFormState(null)
+      toast.success("Record saved successfully")
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to save record")
+      toast.error(err instanceof Error ? err.message : "Failed to save record")
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDeleteRecord = async (id: string) => {
-    if (!confirm("Delete this medical history entry?")) return
-    setDeletingId(id)
+  const handleDeleteRecordClick = (id: string) => {
+    setDeleteRecordId(id)
+  }
+
+  const handleDeleteRecordConfirm = async () => {
+    if (!deleteRecordId) return
+    setDeletingId(deleteRecordId)
     try {
-      await apiDelete(`/api/appointments/${id}`)
-      setRecords((prev) => prev.filter((record) => record.id !== id))
-      if (expandedId === id) {
+      await apiDelete(`/api/appointments/${deleteRecordId}`)
+      setRecords((prev) => prev.filter((record) => record.id !== deleteRecordId))
+      if (expandedId === deleteRecordId) {
         setExpandedId(null)
       }
-      if (editingId === id) {
+      if (editingId === deleteRecordId) {
         cancelEdit()
       }
+      toast.success("Medical record deleted successfully")
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete record")
+      toast.error(err instanceof Error ? err.message : "Failed to delete record")
     } finally {
       setDeletingId(null)
+      setDeleteRecordId(null)
     }
   }
 
@@ -567,7 +578,7 @@ export default function MedicalHistory() {
                 disabled={deletingId === record.id}
                 onClick={(e) => {
                   e.stopPropagation()
-                  handleDeleteRecord(record.id)
+                  handleDeleteRecordClick(record.id)
                 }}
               >
                 {deletingId === record.id ? "Deleting..." : "Delete"}
@@ -770,7 +781,7 @@ export default function MedicalHistory() {
                         size="sm"
                         variant="destructive"
                         disabled={deletingId === record.id}
-                        onClick={() => handleDeleteRecord(record.id)}
+                        onClick={() => handleDeleteRecordClick(record.id)}
                       >
                         {deletingId === record.id ? "Deleting..." : "Delete"}
                       </Button>
@@ -1008,6 +1019,15 @@ export default function MedicalHistory() {
           renderTableView()
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteRecordId !== null}
+        onOpenChange={(open) => !open && setDeleteRecordId(null)}
+        title="Delete Medical Record"
+        description="Are you sure you want to delete this medical history entry? This action cannot be undone."
+        onConfirm={handleDeleteRecordConfirm}
+        variant="danger"
+      />
     </>
   )
 }

@@ -4,6 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Trash2, RotateCcw, Loader2 } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { useToast } from "@/components/common/Toast";
 
 interface DeletedItem {
   id: number;
@@ -18,6 +20,9 @@ const RecycleBin: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     loadItems();
@@ -28,7 +33,6 @@ const RecycleBin: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // TODO: Replace with real API endpoint
       const res = await apiGet<DeletedItem[]>("/api/recycle-bin");
       setItems(res.data || []);
     } catch (err) {
@@ -41,27 +45,34 @@ const RecycleBin: React.FC = () => {
   const handleRestore = async (id: number) => {
     setRestoringId(id);
     try {
-      // TODO: Replace with real API endpoint
       await apiPost(`/api/recycle-bin/${id}/restore`, {});
       setItems((prev) => prev.filter((item) => item.id !== id));
+      toast.success("Item restored successfully");
     } catch (err) {
-      alert("Failed to restore item");
+      toast.error("Failed to restore item");
     } finally {
       setRestoringId(null);
     }
   };
 
-  const handlePermanentDelete = async (id: number) => {
-    if (!window.confirm("Permanently delete this item? This cannot be undone.")) return;
-    setDeletingId(id);
+  const openDeleteDialog = (id: number) => {
+    setItemToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handlePermanentDelete = async () => {
+    if (!itemToDelete) return;
+    setDeletingId(itemToDelete);
+    setDeleteDialogOpen(false);
     try {
-      // TODO: Replace with real API endpoint
-      await apiPost(`/api/recycle-bin/${id}/delete`, {});
-      setItems((prev) => prev.filter((item) => item.id !== id));
+      await apiPost(`/api/recycle-bin/${itemToDelete}/delete`, {});
+      setItems((prev) => prev.filter((item) => item.id !== itemToDelete));
+      toast.success("Item permanently deleted");
     } catch (err) {
-      alert("Failed to delete item");
+      toast.error("Failed to delete item");
     } finally {
       setDeletingId(null);
+      setItemToDelete(null);
     }
   };
 
@@ -116,7 +127,7 @@ const RecycleBin: React.FC = () => {
                               variant="destructive"
                               className="h-8 text-xs"
                               disabled={deletingId === item.id}
-                              onClick={() => handlePermanentDelete(item.id)}
+                              onClick={() => openDeleteDialog(item.id)}
                             >
                               {deletingId === item.id ? <Loader2 className="animate-spin w-4 h-4 mr-1" /> : <Trash2 className="w-4 h-4 mr-1" />}
                               Delete
@@ -132,6 +143,16 @@ const RecycleBin: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Permanently Delete Item"
+        description="This action cannot be undone. The item will be permanently removed from the system."
+        confirmText="Delete"
+        variant="destructive"
+        onConfirm={handlePermanentDelete}
+      />
     </>
   );
 };

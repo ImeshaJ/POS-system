@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { apiPost } from "@/lib/api";
 import registerImg from "@/assets/images/register.png";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -36,23 +36,15 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/register", {
+      await apiPost("/api/auth/register", {
         email,
         username,
         password,
         role,
       });
-      if (res.data.success) {
-        navigate("/login");
-      } else {
-        setError(res.data.message || "Registration failed");
-      }
+      navigate("/login");
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.message || "Server error");
-      } else {
-        setError("Server error");
-      }
+      setError(err instanceof Error ? err.message : "Server error");
     } finally {
       setLoading(false);
     }

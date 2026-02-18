@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 import type { LucideIcon } from "lucide-react"
 import { Building2, ClipboardList, Filter, Mail, MapPin, Phone, Search as SearchIcon, Sparkles, Tag, Users, Wallet } from "lucide-react"
 
@@ -45,6 +47,7 @@ const STATUS_TONES: Record<Supplier["status"], string> = {
 const getStatusTone = (status: Supplier["status"]) => STATUS_TONES[status] || "border-slate-200 bg-slate-50 text-slate-600"
 
 export default function SupplierList() {
+  const toast = useToast()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [search, setSearch] = useState("")
   const [filterCategory, setFilterCategory] = useState("All")
@@ -53,6 +56,8 @@ export default function SupplierList() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [supplierToDelete, setSupplierToDelete] = useState<{ id: string; dbId: number } | null>(null)
 
   const [form, setForm] = useState<Omit<Supplier, "id" | "dbId">>({
     name: "",
@@ -194,7 +199,7 @@ export default function SupplierList() {
 
   async function saveSupplier() {
     if (!form.name || !form.phone || !form.category) {
-      alert("Please fill in required fields: Name, Phone, Category")
+      toast.warning("Please fill in required fields: Name, Phone, Category")
       return
     }
 
@@ -263,20 +268,28 @@ export default function SupplierList() {
       }
 
       closeModal()
-      alert(editingSupplier ? "Supplier updated" : "Supplier added")
+      toast.success(editingSupplier ? "Supplier updated" : "Supplier added")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to save supplier")
+      toast.error(e instanceof Error ? e.message : "Failed to save supplier")
     }
   }
 
-  async function deleteSupplier(id: string, dbId: number) {
-    if (!confirm("Delete this supplier?")) return
+  function handleDeleteClick(id: string, dbId: number) {
+    setSupplierToDelete({ id, dbId })
+    setDeleteDialogOpen(true)
+  }
+
+  async function handleDeleteConfirm() {
+    if (!supplierToDelete) return
     try {
-      await apiDelete(`/api/suppliers/${dbId}`)
-      setSuppliers((prev) => prev.filter((s) => s.id !== id))
-      alert("Supplier deleted")
+      await apiDelete(`/api/suppliers/${supplierToDelete.dbId}`)
+      setSuppliers((prev) => prev.filter((s) => s.id !== supplierToDelete.id))
+      toast.success("Supplier deleted")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to delete supplier")
+      toast.error(e instanceof Error ? e.message : "Failed to delete supplier")
+    } finally {
+      setDeleteDialogOpen(false)
+      setSupplierToDelete(null)
     }
   }
 
@@ -502,7 +515,7 @@ export default function SupplierList() {
                             <Button size="sm" variant="outline" className="rounded-2xl border-border/60" onClick={() => openEditModal(s)}>
                               Edit
                             </Button>
-                            <Button size="sm" variant="destructive" className="rounded-2xl" onClick={() => deleteSupplier(s.id, s.dbId)}>
+                            <Button size="sm" variant="destructive" className="rounded-2xl" onClick={() => handleDeleteClick(s.id, s.dbId)}>
                               Delete
                             </Button>
                           </div>
@@ -641,6 +654,16 @@ export default function SupplierList() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Supplier"
+        description="Are you sure you want to delete this supplier? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={handleDeleteConfirm}
+        variant="destructive"
+      />
     </>
   )
 }

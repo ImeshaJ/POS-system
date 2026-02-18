@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { apiPost } from "@/lib/api";
 import resetImg from "@/assets/images/resetpassword.png";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -36,22 +36,14 @@ export default function ResetPassword() {
     setSuccess("");
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/reset-password", {
+      await apiPost("/api/auth/reset-password", {
         email,
         newPassword,
       });
-      if (res.data.success) {
-        setSuccess("Password reset successfully! Redirecting to login...");
-        setTimeout(() => navigate("/login"), 2000);
-      } else {
-        setError(res.data.message || "Password reset failed");
-      }
+      setSuccess("Password reset successfully! Redirecting to login...");
+      setTimeout(() => navigate("/login"), 2000);
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.message || "Server error");
-      } else {
-        setError("Server error");
-      }
+      setError(err instanceof Error ? err.message : "Server error");
     } finally {
       setLoading(false);
     }

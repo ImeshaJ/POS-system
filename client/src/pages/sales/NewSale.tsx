@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Trash2, Plus, ShoppingCart, CheckCircle, AlertCircle, MapPin, DollarSign } from "lucide-react"
 import { apiGet, apiPost } from "@/lib/api"
+import { useToast } from "@/components/common/Toast"
 
 type ClientInfo = {
   clientCode: string
@@ -85,6 +86,7 @@ const today = new Date().toISOString().split("T")[0]
 
 export default function NewSale() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [invoiceNo] = useState(generateInvoiceNumber())
 
   const [customerType, setCustomerType] = useState<"guest" | "saved" | "new">("guest")
@@ -231,7 +233,7 @@ export default function NewSale() {
 
   const handleCompleteSaleClick = () => {
     if (items.length === 0) {
-      alert("Add at least one item")
+      toast.warning("Add at least one item")
       return
     }
     setShowConfirmation(true)
@@ -239,7 +241,7 @@ export default function NewSale() {
 
   const confirmPayment = async () => {
     if (items.length === 0) {
-      alert("Add at least one item")
+      toast.warning("Add at least one item")
       return
     }
 
@@ -305,7 +307,7 @@ export default function NewSale() {
         navigate(`/sales/invoice/${invoiceNo}`, { state: sale })
       }, 2000)
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to save sale")
+      toast.error(err instanceof Error ? err.message : "Failed to save sale")
     } finally {
       setSaving(false)
     }

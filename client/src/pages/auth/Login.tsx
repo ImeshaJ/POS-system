@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "@/lib/authContext";
-import axios from "axios";
+import { apiPost } from "@/lib/api";
 import loginImg from "@/assets/images/login.png";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -29,25 +29,19 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/login", {
+      const res = await apiPost<{ user: { id: number; email: string; username: string; role: "admin" | "staff" }; token: string }>("/api/auth/login", {
         identifier: loginIdentifier,
         password,
         role,
       });
-      if (res.data.success) {
-        setAuth(res.data.user, res.data.token);
-        const userRole = res.data.user?.role ?? role;
-        if (userRole === 'admin') navigate("/dashboard");
-        else navigate("/sales/new");
-      } else {
-        setError(res.data.message || "Login failed");
-      }
+      // API returns {success, user, token} directly, not wrapped in data
+      const response = res as unknown as { success: boolean; user: { id: number; email: string; username: string; role: "admin" | "staff" }; token: string };
+      setAuth(response.user, response.token);
+      const userRole = response.user?.role ?? role;
+      if (userRole === 'admin') navigate("/dashboard");
+      else navigate("/sales/new");
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.message || "Server error");
-      } else {
-        setError("Server error");
-      }
+      setError(err instanceof Error ? err.message : "Server error");
     } finally {
       setLoading(false);
     }

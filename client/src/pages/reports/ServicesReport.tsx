@@ -464,7 +464,7 @@ export default function ServicesReport() {
 
   const consoleFooter = (
     <div className="flex flex-wrap gap-3 text-sm">
-      {appointmentLoading && <span className="text-muted-foreground">Syncing appointments…</span>}
+      {appointmentLoading && <span className="text-muted-foreground">Syncing appointments...</span>}
       {!appointmentLoading && !appointmentError && <span className="text-muted-foreground">{appointments.length} appointments scanned</span>}
       {appointmentError && <span className="text-rose-500">{appointmentError}</span>}
       <Badge variant="secondary" className="rounded-2xl border-dashed text-xs">
@@ -707,7 +707,7 @@ export default function ServicesReport() {
                     ></div>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {service.bookings} bookings • {service.origin === "manual" ? "Manual" : "Appointment"}
+                    {service.bookings} bookings | {service.origin === "manual" ? "Manual" : "Appointment"}
                   </p>
                 </div>
               ))

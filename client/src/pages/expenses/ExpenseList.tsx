@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, ArrowUpRight, Filter, RefreshCcw, Search, Sparkles, Wallet } from "lucide-react"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 type Expense = {
   id: string
@@ -20,6 +22,7 @@ type Expense = {
 }
 
 export default function ExpenseList() {
+  const toast = useToast()
   const [expenses, setExpenses] = useState<Expense[]>(() => {
     const saved = localStorage.getItem("expenses")
     if (saved) {
@@ -36,6 +39,8 @@ export default function ExpenseList() {
   const [filterStatus, setFilterStatus] = useState("All")
   const [sortBy, setSortBy] = useState("date")
   const [dateRange, setDateRange] = useState({ from: "", to: "" })
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null)
 
   useEffect(() => {
     localStorage.setItem("expenses", JSON.stringify(expenses))
@@ -71,17 +76,24 @@ export default function ExpenseList() {
     }
   })
 
-  function deleteExpense(id: string) {
-    if (!confirm("Delete this expense?")) return
-    setExpenses((prev) => prev.filter((e) => e.id !== id))
-    alert("Expense deleted ✅")
+  function handleDeleteClick(id: string) {
+    setExpenseToDelete(id)
+    setDeleteDialogOpen(true)
+  }
+
+  function handleDeleteConfirm() {
+    if (!expenseToDelete) return
+    setExpenses((prev) => prev.filter((e) => e.id !== expenseToDelete))
+    toast.success("Expense deleted successfully")
+    setDeleteDialogOpen(false)
+    setExpenseToDelete(null)
   }
 
   function updateStatus(id: string, status: "Pending" | "Paid" | "Rejected") {
     setExpenses((prev) =>
       prev.map((e) => (e.id === id ? { ...e, status } : e))
     )
-    alert("Status updated ✅")
+    toast.success("Status updated successfully")
   }
 
   function exportToCSV() {
@@ -422,7 +434,7 @@ export default function ExpenseList() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => deleteExpense(expense.id)}
+                            onClick={() => handleDeleteClick(expense.id)}
                             className="rounded-2xl px-4 text-xs"
                           >
                             Delete
@@ -468,6 +480,16 @@ export default function ExpenseList() {
           </CardContent>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Expense"
+        description="Are you sure you want to delete this expense? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={handleDeleteConfirm}
+        variant="destructive"
+      />
     </div>
   )
 }

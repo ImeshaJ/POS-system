@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Package, Boxes, Tag, Barcode, Printer, RefreshCcw, Plus, Trash2, Undo2, TrendingUp, AlertTriangle } from "lucide-react"
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
+import { useToast } from "@/components/common/Toast"
 
 interface ProductItem {
   id: number
@@ -91,6 +93,9 @@ const AddProduct = () => {
   const [categories, setCategories] = useState(["Medicines", "Food", "Accessories", "Equipment", "Supplies"])
   const [newUnit, setNewUnit] = useState("")
   const [newCategory, setNewCategory] = useState("")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [productToDelete, setProductToDelete] = useState<number | null>(null)
+  const toast = useToast()
 
   useEffect(() => {
     let mounted = true
@@ -191,7 +196,7 @@ const AddProduct = () => {
 
   const addProduct = async () => {
     if (!code || !name || !category || !unit || !sellingPrice || !expiryDate || !supplier) {
-      alert("Please fill all required fields")
+      toast.warning("Please fill all required fields")
       return
     }
 
@@ -227,9 +232,9 @@ const AddProduct = () => {
       const mapped = mapProductRow(created.data, supplierMap)
       setProducts((prev) => [mapped, ...prev])
       resetForm()
-      alert("Product purchased and added to stock!")
+      toast.success("Product purchased and added to stock!")
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to add product")
+      toast.error(err instanceof Error ? err.message : "Failed to add product")
     }
   }
 
@@ -249,13 +254,22 @@ const AddProduct = () => {
     setLabelQty(1)
   }
 
-  const removeProduct = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) return
+  const openDeleteDialog = (id: number) => {
+    setProductToDelete(id)
+    setDeleteDialogOpen(true)
+  }
+
+  const removeProduct = async () => {
+    if (!productToDelete) return
+    setDeleteDialogOpen(false)
     try {
-      await apiDelete(`/api/products/${id}`)
-      setProducts((prev) => prev.filter((p) => p.id !== id))
+      await apiDelete(`/api/products/${productToDelete}`)
+      setProducts((prev) => prev.filter((p) => p.id !== productToDelete))
+      toast.success("Product deleted successfully")
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete product")
+      toast.error(err instanceof Error ? err.message : "Failed to delete product")
+    } finally {
+      setProductToDelete(null)
     }
   }
 
@@ -270,8 +284,9 @@ const AddProduct = () => {
       setProducts((prev) =>
         prev.map((p) => (p.id === id ? mapProductRow(updated.data, supplierMap) : p))
       )
+      toast.success("Product marked as returned")
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to mark product returned")
+      toast.error(err instanceof Error ? err.message : "Failed to mark product returned")
     }
   }
 
@@ -315,7 +330,7 @@ const AddProduct = () => {
 
     const win = window.open("", "_blank", "width=800,height=600");
     if (!win) {
-      alert("Unable to open print window. Please allow popups for this site.");
+      toast.warning("Unable to open print window. Please allow popups for this site.");
       return;
     }
 
@@ -822,7 +837,7 @@ const AddProduct = () => {
                               <Printer className="mr-1 h-3.5 w-3.5" />
                               Print
                             </Button>
-                            <Button onClick={() => removeProduct(product.id)} variant="destructive" size="sm" className="h-8 text-xs">
+                            <Button onClick={() => openDeleteDialog(product.id)} variant="destructive" size="sm" className="h-8 text-xs">
                               <Trash2 className="mr-1 h-3.5 w-3.5" />
                               Delete
                             </Button>
@@ -869,7 +884,7 @@ const AddProduct = () => {
               </div>
 
               <Button
-                onClick={() => alert("Products saved successfully!")}
+                onClick={() => toast.success("Products saved successfully!")}
                 className="h-11 w-full bg-[#16a34a] text-white hover:bg-[#15803d] md:w-auto"
               >
                 <Tag className="mr-2 h-4 w-4" />
@@ -879,6 +894,16 @@ const AddProduct = () => {
           </Card>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Product"
+        description="Are you sure you want to delete this product? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+        onConfirm={removeProduct}
+      />
     </>
   )
 }

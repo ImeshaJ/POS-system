@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { ArrowUpRight, ClipboardCheck, Filter, Layers, Search, Sparkles, Wallet } from "lucide-react"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 type Expense = {
   id: string
@@ -72,6 +74,7 @@ const EXPENSE_TYPES: Record<string, string[]> = {
 const PAYMENT_METHODS = ["Cash", "Bank Transfer", "Check", "Card", "Credit"]
 
 export default function AddExpense() {
+  const toast = useToast()
   const [expenses, setExpenses] = useState<Expense[]>(() => {
     const saved = localStorage.getItem("expenses")
     if (saved) {
@@ -86,6 +89,8 @@ export default function AddExpense() {
   const [showList, setShowList] = useState(false)
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("All")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null)
 
   const [form, setForm] = useState<ExpenseForm>(createDefaultExpenseForm())
 
@@ -101,7 +106,7 @@ export default function AddExpense() {
     const finalType = form.type === "Add New" ? form.customType : form.type
 
     if (!finalCategory || !finalType || !form.amount || !form.date) {
-      alert("Please fill all required fields")
+      toast.warning("Please fill all required fields")
       return
     }
 
@@ -120,24 +125,31 @@ export default function AddExpense() {
 
     setExpenses((prev) => [newExpense, ...prev])
     resetForm()
-    alert("Expense added successfully ✅")
+    toast.success("Expense added successfully")
   }
 
   function resetForm() {
     setForm(createDefaultExpenseForm())
   }
 
-  function deleteExpense(id: string) {
-    if (!confirm("Delete this expense?")) return
-    setExpenses((prev) => prev.filter((e) => e.id !== id))
-    alert("Expense deleted ✅")
+  function handleDeleteClick(id: string) {
+    setExpenseToDelete(id)
+    setDeleteDialogOpen(true)
+  }
+
+  function handleDeleteConfirm() {
+    if (!expenseToDelete) return
+    setExpenses((prev) => prev.filter((e) => e.id !== expenseToDelete))
+    toast.success("Expense deleted successfully")
+    setDeleteDialogOpen(false)
+    setExpenseToDelete(null)
   }
 
   function updateStatus(id: string, status: "Pending" | "Paid" | "Rejected") {
     setExpenses((prev) =>
       prev.map((e) => (e.id === id ? { ...e, status } : e))
     )
-    alert("Status updated ✅")
+    toast.success("Status updated successfully")
   }
 
   function exportToCSV() {
@@ -548,7 +560,7 @@ export default function AddExpense() {
                               </select>
                             </td>
                             <td className="px-4 py-4 text-center">
-                              <Button size="sm" variant="destructive" onClick={() => deleteExpense(expense.id)} className="rounded-2xl px-4 text-xs">
+                              <Button size="sm" variant="destructive" onClick={() => handleDeleteClick(expense.id)} className="rounded-2xl px-4 text-xs">
                                 Delete
                               </Button>
                             </td>
@@ -563,6 +575,16 @@ export default function AddExpense() {
           </Card>
         </>
       )}
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Expense"
+        description="Are you sure you want to delete this expense? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={handleDeleteConfirm}
+        variant="destructive"
+      />
     </div>
   )
 }

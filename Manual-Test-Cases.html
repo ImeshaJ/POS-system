@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Furry Friends POS - Manual Test Cases</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11px;
+            line-height: 1.4;
+            color: #333;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #002366;
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #002366;
+        }
+        h2 {
+            color: #002366;
+            font-size: 16px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            background: linear-gradient(to right, #002366, #1a4d99);
+            color: white;
+            border-radius: 4px;
+            page-break-after: avoid;
+        }
+        h3 {
+            color: #002366;
+            font-size: 13px;
+            margin-top: 15px;
+            margin-bottom: 8px;
+            padding-left: 10px;
+            border-left: 4px solid #002366;
+            page-break-after: avoid;
+        }
+        .overview {
+            background: #f5f7fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #002366;
+        }
+        .overview p {
+            margin: 5px 0;
+        }
+        .overview strong {
+            color: #002366;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 10px;
+            page-break-inside: auto;
+        }
+        tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+        th {
+            background: #002366;
+            color: white;
+            padding: 8px 6px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 10px;
+        }
+        td {
+            padding: 6px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f0f4ff;
+        }
+        .test-id {
+            font-weight: bold;
+            color: #002366;
+            white-space: nowrap;
+            width: 80px;
+        }
+        .steps {
+            width: 25%;
+        }
+        .expected {
+            width: 25%;
+        }
+        .actual {
+            width: 12%;
+            background: #fffef0;
+        }
+        .summary-table {
+            width: 50%;
+            margin: 20px auto;
+        }
+        .summary-table th {
+            background: #1a4d99;
+        }
+        .summary-table td {
+            text-align: center;
+        }
+        .notes {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #ffc107;
+        }
+        .notes h3 {
+            border-left: none;
+            padding-left: 0;
+            color: #856404;
+        }
+        .notes ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        .notes li {
+            margin: 5px 0;
+        }
+        .header-info {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header-info p {
+            color: #666;
+            font-size: 12px;
+        }
+        .total-badge {
+            display: inline-block;
+            background: #002366;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        @media print {
+            body {
+                padding: 10px;
+                font-size: 9px;
+            }
+            h1 {
+                font-size: 20px;
+            }
+            h2 {
+                font-size: 14px;
+                margin-top: 15px;
+            }
+            h3 {
+                font-size: 11px;
+            }
+            table {
+                font-size: 8px;
+            }
+            th, td {
+                padding: 4px;
+            }
+            .overview, .notes {
+                padding: 10px;
+            }
+        }
+        @page {
+            margin: 1cm;
+            size: A4 landscape;
+        }
+    </style>
+</head>
+<body>
+    <h1>Furry Friends POS System<br>Complete Manual Test Cases</h1>
+
+    <div class="header-info">
+        <p>Pet Management System - Quality Assurance Document</p>
+        <p>Generated: <script>document.write(new Date().toLocaleDateString())</script></p>
+        <span class="total-badge">200+ Test Cases</span>
+    </div>
+
+    <div class="overview">
+        <h3 style="border:none; padding:0; margin-bottom:10px;">Application Overview</h3>
+        <p><strong>Frontend URL:</strong> http://localhost:5173</p>
+        <p><strong>Backend API:</strong> http://localhost:5001</p>
+        <p><strong>Test Credentials:</strong> Username: <code>Ashini</code> | Password: <code>123456</code></p>
+    </div>
+
+    <!-- MODULE 1: AUTHENTICATION -->
+    <h2>MODULE 1: AUTHENTICATION</h2>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">AUTH-001</td><td>Splash page loads</td><td>1. Open http://localhost:5173/</td><td>Splash page displays with Furry Friends branding and redirects to login</td><td></td></tr>
+            <tr><td class="test-id">AUTH-002</td><td>Login with valid admin credentials</td><td>1. Go to /login<br>2. Select "Admin" role<br>3. Enter username "Ashini"<br>4. Enter password "123456"<br>5. Click "Sign In"</td><td>User logged in, redirected to /dashboard</td><td></td></tr>
+            <tr><td class="test-id">AUTH-003</td><td>Login with valid staff credentials</td><td>1. Go to /login<br>2. Select "Staff" role<br>3. Enter valid staff credentials<br>4. Click "Sign In"</td><td>User logged in, redirected to /sales/new</td><td></td></tr>
+            <tr><td class="test-id">AUTH-004</td><td>Login with invalid credentials</td><td>1. Go to /login<br>2. Enter username "wronguser"<br>3. Enter password "wrongpass"<br>4. Click "Sign In"</td><td>Error message "Invalid credentials" displayed</td><td></td></tr>
+            <tr><td class="test-id">AUTH-005</td><td>Login with empty fields</td><td>1. Go to /login<br>2. Leave username empty<br>3. Leave password empty<br>4. Click "Sign In"</td><td>Error message "Please fill all fields" displayed</td><td></td></tr>
+            <tr><td class="test-id">AUTH-006</td><td>Password visibility toggle</td><td>1. Go to /login<br>2. Enter password<br>3. Click eye icon</td><td>Password toggles between hidden (dots) and visible (text)</td><td></td></tr>
+            <tr><td class="test-id">AUTH-007</td><td>Role selection toggle</td><td>1. Go to /login<br>2. Click "Admin" button<br>3. Click "Staff" button</td><td>Role buttons toggle active state, selected role highlighted</td><td></td></tr>
+            <tr><td class="test-id">AUTH-008</td><td>Navigate to Register page</td><td>1. Go to /login<br>2. Click "Create account" link</td><td>Navigates to /register page</td><td></td></tr>
+            <tr><td class="test-id">AUTH-009</td><td>Navigate to Reset Password</td><td>1. Go to /login<br>2. Click "Forgot password?" link</td><td>Navigates to /reset-password page</td><td></td></tr>
+            <tr><td class="test-id">AUTH-010</td><td>Register new user</td><td>1. Go to /register<br>2. Enter email<br>3. Enter username<br>4. Enter password<br>5. Confirm password<br>6. Click "Register"</td><td>Success message, user can now login</td><td></td></tr>
+            <tr><td class="test-id">AUTH-011</td><td>Register with duplicate email</td><td>1. Go to /register<br>2. Enter existing email<br>3. Fill other fields<br>4. Click "Register"</td><td>Error "Email or username already exists"</td><td></td></tr>
+            <tr><td class="test-id">AUTH-012</td><td>Reset password</td><td>1. Go to /reset-password<br>2. Enter registered email<br>3. Enter new password<br>4. Click "Reset"</td><td>Success message "Password reset successful"</td><td></td></tr>
+            <tr><td class="test-id">AUTH-013</td><td>Logout functionality</td><td>1. Login successfully<br>2. Click logout button in header</td><td>User logged out, redirected to /login</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <!-- MODULE 2: DASHBOARD -->
+    <h2>MODULE 2: DASHBOARD</h2>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">DASH-001</td><td>Admin dashboard loads</td><td>1. Login as admin<br>2. Navigate to /dashboard</td><td>Dashboard displays with KPIs, charts, sales trends</td><td></td></tr>
+            <tr><td class="test-id">DASH-002</td><td>Dashboard KPI cards display</td><td>1. Open /dashboard</td><td>Shows Today's Sales, Total Products, Low Stock, Pending Appointments cards</td><td></td></tr>
+            <tr><td class="test-id">DASH-003</td><td>Revenue chart displays</td><td>1. Open /dashboard</td><td>Revenue/sales chart renders with data</td><td></td></tr>
+            <tr><td class="test-id">DASH-004</td><td>Recent sales table</td><td>1. Open /dashboard</td><td>Recent sales list shows with invoice numbers and amounts</td><td></td></tr>
+            <tr><td class="test-id">DASH-005</td><td>Quick action buttons</td><td>1. Open /dashboard<br>2. Click quick action buttons</td><td>Navigates to respective pages (New Sale, Add Product, etc.)</td><td></td></tr>
+            <tr><td class="test-id">DASH-006</td><td>Staff dashboard loads</td><td>1. Login as staff<br>2. Navigate to /dashboard/staff</td><td>Staff-specific dashboard displays</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <!-- MODULE 3: SALES MANAGEMENT -->
+    <h2>MODULE 3: SALES MANAGEMENT</h2>
+
+    <h3>3.1 New Sale</h3>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">SALE-001</td><td>New sale page loads</td><td>1. Navigate to /sales/new</td><td>Page loads with customer section, items section, payment section</td><td></td></tr>
+            <tr><td class="test-id">SALE-002</td><td>Guest sale mode</td><td>1. Go to /sales/new<br>2. Keep "Guest" mode selected<br>3. Add items<br>4. Complete sale</td><td>Sale created without customer info</td><td></td></tr>
+            <tr><td class="test-id">SALE-003</td><td>Select saved customer</td><td>1. Go to /sales/new<br>2. Select "Saved Customer"<br>3. Choose customer from dropdown</td><td>Customer info auto-fills, pets associated shown</td><td></td></tr>
+            <tr><td class="test-id">SALE-004</td><td>Create new customer during sale</td><td>1. Go to /sales/new<br>2. Select "New Customer"<br>3. Enter customer code, name, pet name</td><td>New customer fields enabled for input</td><td></td></tr>
+            <tr><td class="test-id">SALE-005</td><td>Add product to sale</td><td>1. Click product search field<br>2. Type product name<br>3. Select from suggestions</td><td>Product added to items list with price</td><td></td></tr>
+            <tr><td class="test-id">SALE-006</td><td>Add service to sale</td><td>1. Click product/service search<br>2. Type service name<br>3. Select service</td><td>Service added to items list</td><td></td></tr>
+            <tr><td class="test-id">SALE-007</td><td>Update item quantity</td><td>1. Add product to sale<br>2. Change quantity field</td><td>Line total recalculates (price x qty)</td><td></td></tr>
+            <tr><td class="test-id">SALE-008</td><td>Update item price</td><td>1. Add product<br>2. Modify price field</td><td>Line total and grand total recalculate</td><td></td></tr>
+            <tr><td class="test-id">SALE-009</td><td>Remove item from sale</td><td>1. Add multiple items<br>2. Click remove button on an item</td><td>Item removed, totals recalculate</td><td></td></tr>
+            <tr><td class="test-id">SALE-010</td><td>Add multiple items</td><td>1. Add first product<br>2. Click "Add New Item"<br>3. Add second product</td><td>Both items appear in list, totals sum correctly</td><td></td></tr>
+            <tr><td class="test-id">SALE-011</td><td>Apply discount (fixed Rs)</td><td>1. Add items<br>2. Select "Rs" discount type<br>3. Enter discount amount</td><td>Discount deducted from total</td><td></td></tr>
+            <tr><td class="test-id">SALE-012</td><td>Apply discount (percentage)</td><td>1. Add items<br>2. Select "%" discount type<br>3. Enter percentage</td><td>Percentage discount calculated and deducted</td><td></td></tr>
+            <tr><td class="test-id">SALE-013</td><td>VAT calculation</td><td>1. Add items<br>2. Check VAT field (default 0%)<br>3. Change VAT rate</td><td>VAT amount calculated and added to total</td><td></td></tr>
+            <tr><td class="test-id">SALE-014</td><td>Payment method selection</td><td>1. Select "Cash" from dropdown<br>2. Select "Card"<br>3. Select "Bank Transfer"</td><td>Payment method updates in form</td><td></td></tr>
+            <tr><td class="test-id">SALE-015</td><td>Calculate change</td><td>1. Add items (total 1000)<br>2. Enter received amount 1500<br>3. Check change display</td><td>Change shows Rs. 500</td><td></td></tr>
+            <tr><td class="test-id">SALE-016</td><td>Complete sale - Cash</td><td>1. Add items<br>2. Select Cash payment<br>3. Enter received amount<br>4. Click "Complete Sale"</td><td>Confirmation dialog appears with summary</td><td></td></tr>
+            <tr><td class="test-id">SALE-017</td><td>Confirm sale submission</td><td>1. Complete sale steps<br>2. Click "Confirm" in dialog</td><td>Sale created, success message with invoice number</td><td></td></tr>
+            <tr><td class="test-id">SALE-018</td><td>Cancel sale submission</td><td>1. Complete sale steps<br>2. Click "Cancel" in dialog</td><td>Returns to sale form, no sale created</td><td></td></tr>
+            <tr><td class="test-id">SALE-019</td><td>Add notes to sale</td><td>1. Enter text in Notes field<br>2. Complete sale</td><td>Notes saved with sale record</td><td></td></tr>
+            <tr><td class="test-id">SALE-020</td><td>Validation - no items</td><td>1. Try to complete sale without items</td><td>Error: "Please add at least one item"</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <h3>3.2 Sales List</h3>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">SALE-021</td><td>Sales list page loads</td><td>1. Navigate to /sales/list</td><td>Page displays with sales table and filters</td><td></td></tr>
+            <tr><td class="test-id">SALE-022</td><td>Search sales by invoice</td><td>1. Enter invoice number in search<br>2. Press Enter or wait</td><td>Filtered results show matching invoices</td><td></td></tr>
+            <tr><td class="test-id">SALE-023</td><td>Search sales by customer</td><td>1. Enter customer name in search</td><td>Filtered results show sales for that customer</td><td></td></tr>
+            <tr><td class="test-id">SALE-024</td><td>Filter by status - All</td><td>1. Select "All" from status dropdown</td><td>All sales displayed</td><td></td></tr>
+            <tr><td class="test-id">SALE-025</td><td>Filter by status - Completed</td><td>1. Select "Completed" from status</td><td>Only completed sales shown</td><td></td></tr>
+            <tr><td class="test-id">SALE-026</td><td>Filter by status - Returned</td><td>1. Select "Returned" from status</td><td>Only returned/partially returned sales shown</td><td></td></tr>
+            <tr><td class="test-id">SALE-027</td><td>View sale details</td><td>1. Click "View" button on a sale</td><td>Sale details modal/page opens with full info</td><td></td></tr>
+            <tr><td class="test-id">SALE-028</td><td>Print receipt from list</td><td>1. Click "Print Receipt" button</td><td>Receipt print dialog opens</td><td></td></tr>
+            <tr><td class="test-id">SALE-029</td><td>Delete sale</td><td>1. Click "Delete" button<br>2. Confirm in dialog</td><td>Sale deleted, removed from list</td><td></td></tr>
+            <tr><td class="test-id">SALE-030</td><td>Cancel delete sale</td><td>1. Click "Delete"<br>2. Click "Cancel" in dialog</td><td>Sale not deleted, dialog closes</td><td></td></tr>
+            <tr><td class="test-id">SALE-031</td><td>Pagination</td><td>1. If many sales, check pagination controls</td><td>Navigate between pages correctly</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <h3>3.3 Sales Invoice & Return</h3>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">SALE-032</td><td>View invoice page</td><td>1. Navigate to /sales/invoice/{invoiceNo}</td><td>Invoice displays with company info, items, totals</td><td></td></tr>
+            <tr><td class="test-id">SALE-033</td><td>Print invoice (A4)</td><td>1. Open invoice<br>2. Click "Print Invoice"</td><td>Print dialog opens with A4 format</td><td></td></tr>
+            <tr><td class="test-id">SALE-034</td><td>Print receipt (80mm)</td><td>1. Open invoice<br>2. Click "Print Receipt"</td><td>Navigates to 80mm receipt format</td><td></td></tr>
+            <tr><td class="test-id">SALE-035</td><td>Email invoice</td><td>1. Open invoice<br>2. Click "Email"<br>3. Enter email address</td><td>Invoice sent to email</td><td></td></tr>
+            <tr><td class="test-id">SALE-036</td><td>Back navigation</td><td>1. Open invoice<br>2. Click "Back" button</td><td>Returns to previous page</td><td></td></tr>
+            <tr><td class="test-id">SALE-037</td><td>Sales return page loads</td><td>1. Navigate to /sales/return</td><td>Page displays with return form</td><td></td></tr>
+            <tr><td class="test-id">SALE-038</td><td>Search sale for return</td><td>1. Enter invoice number<br>2. Search</td><td>Original sale details displayed</td><td></td></tr>
+            <tr><td class="test-id">SALE-039</td><td>Select items to return</td><td>1. Find sale<br>2. Check items to return<br>3. Enter return quantities</td><td>Return items selected</td><td></td></tr>
+            <tr><td class="test-id">SALE-040</td><td>Process full return</td><td>1. Select all items<br>2. Enter reason<br>3. Submit</td><td>Full return processed, sale status updated</td><td></td></tr>
+            <tr><td class="test-id">SALE-041</td><td>Process partial return</td><td>1. Select some items<br>2. Submit</td><td>Partial return processed</td><td></td></tr>
+            <tr><td class="test-id">SALE-042</td><td>Return reason required</td><td>1. Try to submit without reason</td><td>Validation error for reason field</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <!-- MODULE 4: PURCHASE MANAGEMENT -->
+    <h2>MODULE 4: PURCHASE MANAGEMENT</h2>
+
+    <h3>4.1 Add Product</h3>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">PROD-001</td><td>Add product page loads</td><td>1. Navigate to /purchases/add</td><td>Page displays with product form and catalog table</td><td></td></tr>
+            <tr><td class="test-id">PROD-002</td><td>Add new product - all fields</td><td>1. Fill all required fields<br>2. Click "Add Product"</td><td>Product added, appears in catalog table</td><td></td></tr>
+            <tr><td class="test-id">PROD-003</td><td>Add product - validation</td><td>1. Leave required fields empty<br>2. Click "Add Product"</td><td>Validation errors displayed for required fields</td><td></td></tr>
+            <tr><td class="test-id">PROD-004</td><td>Select existing supplier</td><td>1. Click supplier dropdown<br>2. Type supplier name<br>3. Select from list</td><td>Supplier selected</td><td></td></tr>
+            <tr><td class="test-id">PROD-005</td><td>Create new supplier inline</td><td>1. Type new supplier name<br>2. Confirm creation</td><td>New supplier created and selected</td><td></td></tr>
+            <tr><td class="test-id">PROD-006</td><td>Add new category</td><td>1. Click "Add Category"<br>2. Enter category name<br>3. Confirm</td><td>Category added to dropdown</td><td></td></tr>
+            <tr><td class="test-id">PROD-007</td><td>Add new unit</td><td>1. Click "Add Unit"<br>2. Enter unit name<br>3. Confirm</td><td>Unit added to dropdown</td><td></td></tr>
+            <tr><td class="test-id">PROD-008</td><td>Set reorder level</td><td>1. Enter reorder level number</td><td>Reorder level saved</td><td></td></tr>
+            <tr><td class="test-id">PROD-009</td><td>Print product labels</td><td>1. Add product<br>2. Set label quantity<br>3. Click "Print Labels"</td><td>Barcode labels generated for printing</td><td></td></tr>
+            <tr><td class="test-id">PROD-010</td><td>Reset form</td><td>1. Fill form partially<br>2. Click "Reset Form"</td><td>All fields cleared</td><td></td></tr>
+            <tr><td class="test-id">PROD-011</td><td>Delete product</td><td>1. Find product in catalog<br>2. Click "Delete"<br>3. Confirm</td><td>Product deleted from catalog</td><td></td></tr>
+            <tr><td class="test-id">PROD-012</td><td>Mark product as returned</td><td>1. Find product<br>2. Click "Return" button</td><td>Product qty set to 0, status changed</td><td></td></tr>
+            <tr><td class="test-id">PROD-013</td><td>Product status - In Stock</td><td>1. Add product with future expiry, qty > reorder</td><td>Status shows "In Stock"</td><td></td></tr>
+            <tr><td class="test-id">PROD-014</td><td>Product status - Low Stock</td><td>1. Add product with qty <= reorder level</td><td>Status shows "Low Stock"</td><td></td></tr>
+            <tr><td class="test-id">PROD-015</td><td>Product status - Expired</td><td>1. Add product with past expiry date</td><td>Status shows "Expired"</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <h3>4.2 Purchase Operations</h3>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">PURCH-001</td><td>New purchase page loads</td><td>1. Navigate to /purchases/new</td><td>Page displays with supplier, items, summary sections</td><td></td></tr>
+            <tr><td class="test-id">PURCH-002</td><td>Select supplier</td><td>1. Type supplier name<br>2. Select from dropdown</td><td>Supplier selected, shown in form</td><td></td></tr>
+            <tr><td class="test-id">PURCH-003</td><td>Add item to purchase</td><td>1. Search product<br>2. Enter qty<br>3. Enter cost<br>4. Click "Add Item"</td><td>Item added to purchase list</td><td></td></tr>
+            <tr><td class="test-id">PURCH-004</td><td>Add multiple items</td><td>1. Add first item<br>2. Add second item</td><td>Both items in list, totals calculated</td><td></td></tr>
+            <tr><td class="test-id">PURCH-005</td><td>Remove item from purchase</td><td>1. Add items<br>2. Click "Delete" on an item</td><td>Item removed, totals recalculated</td><td></td></tr>
+            <tr><td class="test-id">PURCH-006</td><td>Update item quantity</td><td>1. Change qty field</td><td>Line total updates</td><td></td></tr>
+            <tr><td class="test-id">PURCH-007</td><td>Save purchase</td><td>1. Select supplier<br>2. Add items<br>3. Click "Save Purchase"</td><td>Purchase saved, product quantities updated</td><td></td></tr>
+            <tr><td class="test-id">PURCH-008</td><td>Reset purchase form</td><td>1. Add items<br>2. Click "Reset Form"</td><td>Form cleared, items removed</td><td></td></tr>
+            <tr><td class="test-id">PURCH-009</td><td>Validation - no supplier</td><td>1. Add items without supplier<br>2. Save</td><td>Error: Supplier required</td><td></td></tr>
+            <tr><td class="test-id">PURCH-010</td><td>Validation - no items</td><td>1. Select supplier only<br>2. Save</td><td>Error: Items required</td><td></td></tr>
+            <tr><td class="test-id">PURCH-011</td><td>Purchase list loads</td><td>1. Navigate to /purchases/list</td><td>Purchase history table displayed</td><td></td></tr>
+            <tr><td class="test-id">PURCH-012</td><td>Search purchases</td><td>1. Enter search term</td><td>Filtered results displayed</td><td></td></tr>
+            <tr><td class="test-id">PURCH-013</td><td>Filter by date range</td><td>1. Select start date<br>2. Select end date</td><td>Purchases within range shown</td><td></td></tr>
+            <tr><td class="test-id">PURCH-014</td><td>View purchase details</td><td>1. Click "View" on purchase</td><td>Purchase details displayed</td><td></td></tr>
+            <tr><td class="test-id">PURCH-015</td><td>Delete purchase</td><td>1. Click "Delete"<br>2. Confirm</td><td>Purchase deleted</td><td></td></tr>
+            <tr><td class="test-id">PURCH-016</td><td>Purchase return page loads</td><td>1. Navigate to /purchases/return</td><td>Return form displayed</td><td></td></tr>
+            <tr><td class="test-id">PURCH-017</td><td>Process purchase return</td><td>1. Select items<br>2. Enter quantities<br>3. Submit</td><td>Return processed, inventory updated</td><td></td></tr>
+            <tr><td class="test-id">STOCK-001</td><td>Low stock page loads</td><td>1. Navigate to /purchases/low</td><td>Low stock products listed</td><td></td></tr>
+            <tr><td class="test-id">EXPIRY-001</td><td>Expiry alerts page loads</td><td>1. Navigate to /purchases/expiry</td><td>Products near/past expiry listed</td><td></td></tr>
+            <tr><td class="test-id">EXPIRY-002</td><td>Dispose product</td><td>1. Click "Dispose" on expired item<br>2. Confirm</td><td>Product marked as disposed</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <!-- MODULE 5: CLIENTS & PETS -->
+    <h2>MODULE 5: CLIENTS & PETS</h2>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">CLIENT-001</td><td>Clients list page loads</td><td>1. Navigate to /clients/list</td><td>Client list with search displayed</td><td></td></tr>
+            <tr><td class="test-id">CLIENT-002</td><td>Search clients by name</td><td>1. Enter name in search</td><td>Matching clients shown</td><td></td></tr>
+            <tr><td class="test-id">CLIENT-003</td><td>Search clients by phone</td><td>1. Enter phone number</td><td>Matching clients shown</td><td></td></tr>
+            <tr><td class="test-id">CLIENT-004</td><td>Search clients by pet name</td><td>1. Enter pet name</td><td>Clients with matching pets shown</td><td></td></tr>
+            <tr><td class="test-id">CLIENT-005</td><td>View client details</td><td>1. Click "View" on client</td><td>Detail panel opens with client info and pets</td><td></td></tr>
+            <tr><td class="test-id">CLIENT-006</td><td>Edit client</td><td>1. View client<br>2. Click "Edit"<br>3. Modify fields<br>4. Click "Save"</td><td>Client information updated</td><td></td></tr>
+            <tr><td class="test-id">CLIENT-007</td><td>Cancel edit</td><td>1. Click "Edit"<br>2. Modify fields<br>3. Click "Cancel"</td><td>Changes discarded</td><td></td></tr>
+            <tr><td class="test-id">CLIENT-008</td><td>Delete client</td><td>1. View client<br>2. Click "Delete"<br>3. Confirm</td><td>Client deleted</td><td></td></tr>
+            <tr><td class="test-id">CLIENT-009</td><td>Add pet to client</td><td>1. Edit client<br>2. Enter new pet name<br>3. Click "Add Pet"</td><td>Pet added to client</td><td></td></tr>
+            <tr><td class="test-id">CLIENT-010</td><td>Delete pet from client</td><td>1. Edit client<br>2. Click delete on pet</td><td>Pet removed from client</td><td></td></tr>
+            <tr><td class="test-id">PET-001</td><td>Pets list page loads</td><td>1. Navigate to /pets/list</td><td>Pet list displayed</td><td></td></tr>
+            <tr><td class="test-id">PET-002</td><td>Search pets</td><td>1. Enter pet name in search</td><td>Matching pets shown</td><td></td></tr>
+            <tr><td class="test-id">PET-003</td><td>Edit pet information</td><td>1. Select pet<br>2. Edit fields<br>3. Save</td><td>Pet info updated</td><td></td></tr>
+            <tr><td class="test-id">MED-001</td><td>Medical history page loads</td><td>1. Navigate to /medical-history</td><td>Medical records interface displayed</td><td></td></tr>
+            <tr><td class="test-id">DUE-001</td><td>Due clients page loads</td><td>1. Navigate to /clients/due</td><td>Clients with outstanding dues listed</td><td></td></tr>
+            <tr><td class="test-id">DUE-002</td><td>Record payment</td><td>1. Select client<br>2. Enter payment<br>3. Submit</td><td>Due amount reduced</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <!-- MODULE 6: APPOINTMENTS -->
+    <h2>MODULE 6: APPOINTMENTS</h2>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">APPT-001</td><td>Appointment list loads</td><td>1. Navigate to /appointments/list</td><td>Appointments table with filters displayed</td><td></td></tr>
+            <tr><td class="test-id">APPT-002</td><td>Create new appointment</td><td>1. Click "New Appointment"<br>2. Fill: Date, Time, Client Name, Pet Name<br>3. Save</td><td>Appointment created, appears in list</td><td></td></tr>
+            <tr><td class="test-id">APPT-003</td><td>Validation - required fields</td><td>1. Try to save without required fields</td><td>Validation errors for Date, Time, Client Name, Pet Name</td><td></td></tr>
+            <tr><td class="test-id">APPT-004</td><td>Search appointments</td><td>1. Enter client name in search</td><td>Matching appointments shown</td><td></td></tr>
+            <tr><td class="test-id">APPT-005</td><td>Filter by status - Scheduled</td><td>1. Select "Scheduled" from status filter</td><td>Only scheduled appointments shown</td><td></td></tr>
+            <tr><td class="test-id">APPT-006</td><td>Filter by status - Completed</td><td>1. Select "Completed"</td><td>Only completed appointments shown</td><td></td></tr>
+            <tr><td class="test-id">APPT-007</td><td>Filter by status - Cancelled</td><td>1. Select "Cancelled"</td><td>Only cancelled appointments shown</td><td></td></tr>
+            <tr><td class="test-id">APPT-008</td><td>Filter by doctor</td><td>1. Select doctor from filter</td><td>Appointments for that doctor shown</td><td></td></tr>
+            <tr><td class="test-id">APPT-009</td><td>View appointment details</td><td>1. Click "View" on appointment</td><td>Detail modal opens with full info</td><td></td></tr>
+            <tr><td class="test-id">APPT-010</td><td>Edit appointment</td><td>1. View appointment<br>2. Click "Edit"<br>3. Modify fields<br>4. Save</td><td>Appointment updated</td><td></td></tr>
+            <tr><td class="test-id">APPT-011</td><td>Delete appointment</td><td>1. View appointment<br>2. Click "Delete"<br>3. Confirm</td><td>Appointment deleted</td><td></td></tr>
+            <tr><td class="test-id">APPT-012</td><td>Change appointment status</td><td>1. Edit appointment<br>2. Change status dropdown<br>3. Save</td><td>Status updated</td><td></td></tr>
+            <tr><td class="test-id">APPT-013</td><td>Add attachment</td><td>1. Edit appointment<br>2. Upload file<br>3. Save</td><td>File attached to appointment</td><td></td></tr>
+            <tr><td class="test-id">CAL-001</td><td>Calendar view loads</td><td>1. Navigate to /appointments/calendar</td><td>Calendar displayed with appointments</td><td></td></tr>
+            <tr><td class="test-id">CAL-002</td><td>Navigate months</td><td>1. Click next/previous month arrows</td><td>Calendar shows different month</td><td></td></tr>
+            <tr><td class="test-id">SCHED-001</td><td>Staff schedule loads</td><td>1. Navigate to /appointments/staff</td><td>Staff schedule displayed</td><td></td></tr>
+            <tr><td class="test-id">SCHED-002</td><td>Add staff schedule</td><td>1. Click "Add Schedule"<br>2. Fill details<br>3. Save</td><td>Schedule created</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <!-- MODULE 7: SERVICES -->
+    <h2>MODULE 7: SERVICES</h2>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">SVC-001</td><td>Add service page loads</td><td>1. Navigate to /services/new</td><td>Service package form displayed</td><td></td></tr>
+            <tr><td class="test-id">SVC-002</td><td>Create service package</td><td>1. Fill name, category, price<br>2. Save</td><td>Service created</td><td></td></tr>
+            <tr><td class="test-id">BOARD-001</td><td>Cat boarding page loads</td><td>1. Navigate to /services/boarding</td><td>Boarding management displayed</td><td></td></tr>
+            <tr><td class="test-id">BOARD-002</td><td>Add boarding entry</td><td>1. Fill client, pet, dates<br>2. Save</td><td>Boarding record created</td><td></td></tr>
+            <tr><td class="test-id">BOARD-003</td><td>Check-out pet</td><td>1. Select active boarding<br>2. Click check-out</td><td>Boarding completed</td><td></td></tr>
+            <tr><td class="test-id">GROOM-001</td><td>Grooming page loads</td><td>1. Navigate to /services/grooming</td><td>Grooming services displayed</td><td></td></tr>
+            <tr><td class="test-id">GROOM-002</td><td>Add grooming appointment</td><td>1. Fill client, pet, service type<br>2. Save</td><td>Grooming scheduled</td><td></td></tr>
+            <tr><td class="test-id">GROOM-003</td><td>Complete grooming</td><td>1. Select grooming<br>2. Mark complete</td><td>Status updated to completed</td><td></td></tr>
+            <tr><td class="test-id">SURG-001</td><td>Surgery page loads</td><td>1. Navigate to /services/surgery</td><td>Surgery management displayed</td><td></td></tr>
+            <tr><td class="test-id">SURG-002</td><td>Schedule surgery</td><td>1. Fill patient info, procedure<br>2. Save</td><td>Surgery scheduled</td><td></td></tr>
+            <tr><td class="test-id">PHYS-001</td><td>Physiotherapy page loads</td><td>1. Navigate to /services/physiotherapy</td><td>Physiotherapy services displayed</td><td></td></tr>
+            <tr><td class="test-id">PHYS-002</td><td>Add physiotherapy session</td><td>1. Fill details<br>2. Save</td><td>Session created</td><td></td></tr>
+            <tr><td class="test-id">HOSP-001</td><td>Hospitalization page loads</td><td>1. Navigate to /services/hospitalization</td><td>Hospitalization records displayed</td><td></td></tr>
+            <tr><td class="test-id">HOSP-002</td><td>Admit patient</td><td>1. Fill patient info, reason<br>2. Save</td><td>Patient admitted</td><td></td></tr>
+            <tr><td class="test-id">HOSP-003</td><td>Discharge patient</td><td>1. Select patient<br>2. Enter discharge date<br>3. Discharge</td><td>Patient discharged</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <!-- MODULE 8: SUPPLIERS -->
+    <h2>MODULE 8: SUPPLIERS</h2>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">SUPP-001</td><td>Supplier list loads</td><td>1. Navigate to /suppliers/list</td><td>Supplier list displayed</td><td></td></tr>
+            <tr><td class="test-id">SUPP-002</td><td>Add new supplier</td><td>1. Click "Add supplier"<br>2. Fill: Name, Phone, Category<br>3. Save</td><td>Supplier created</td><td></td></tr>
+            <tr><td class="test-id">SUPP-003</td><td>Validation - required fields</td><td>1. Try to save without Name, Phone, Category</td><td>Validation errors shown</td><td></td></tr>
+            <tr><td class="test-id">SUPP-004</td><td>Edit supplier</td><td>1. Click "Edit"<br>2. Modify fields<br>3. Update</td><td>Supplier updated</td><td></td></tr>
+            <tr><td class="test-id">SUPP-005</td><td>Delete supplier</td><td>1. Click "Delete"<br>2. Confirm</td><td>Supplier deleted</td><td></td></tr>
+            <tr><td class="test-id">SUPP-006</td><td>Search suppliers</td><td>1. Enter search term</td><td>Filtered suppliers shown</td><td></td></tr>
+            <tr><td class="test-id">SUPP-007</td><td>Filter by category</td><td>1. Select category from filter</td><td>Suppliers in category shown</td><td></td></tr>
+            <tr><td class="test-id">SUPP-008</td><td>Supplier due page</td><td>1. Navigate to /suppliers/due</td><td>Supplier dues displayed</td><td></td></tr>
+            <tr><td class="test-id">SUPP-009</td><td>Supplier payments page</td><td>1. Navigate to /suppliers/payments</td><td>Payment records displayed</td><td></td></tr>
+            <tr><td class="test-id">SUPP-010</td><td>Record supplier payment</td><td>1. Select supplier<br>2. Enter payment amount<br>3. Save</td><td>Payment recorded, due reduced</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <!-- MODULE 9: EXPENSES & SALARY -->
+    <h2>MODULE 9: EXPENSES & SALARY</h2>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">EXP-001</td><td>Add expense page loads</td><td>1. Navigate to /expenses/add</td><td>Expense form displayed</td><td></td></tr>
+            <tr><td class="test-id">EXP-002</td><td>Add new expense</td><td>1. Fill: Category, Type, Amount, Date<br>2. Click "Save expense"</td><td>Expense created with auto-generated ID</td><td></td></tr>
+            <tr><td class="test-id">EXP-003</td><td>View expense ledger</td><td>1. Click "View ledger"</td><td>Expense list displayed</td><td></td></tr>
+            <tr><td class="test-id">EXP-004</td><td>Delete expense</td><td>1. Click "Delete" in ledger<br>2. Confirm</td><td>Expense deleted</td><td></td></tr>
+            <tr><td class="test-id">EXP-005</td><td>Export expenses CSV</td><td>1. Click "Export CSV"</td><td>CSV file downloaded</td><td></td></tr>
+            <tr><td class="test-id">EMP-001</td><td>Employee list loads</td><td>1. Navigate to /salary/employees</td><td>Employee list displayed</td><td></td></tr>
+            <tr><td class="test-id">EMP-002</td><td>Add new employee</td><td>1. Click "New hire form"<br>2. Fill required fields<br>3. Save</td><td>Employee created with auto ID</td><td></td></tr>
+            <tr><td class="test-id">EMP-003</td><td>Edit employee</td><td>1. Click "Edit"<br>2. Modify<br>3. Update</td><td>Employee updated</td><td></td></tr>
+            <tr><td class="test-id">EMP-004</td><td>Delete employee</td><td>1. Click "Delete"<br>2. Confirm</td><td>Employee deleted</td><td></td></tr>
+            <tr><td class="test-id">SAL-001</td><td>Salary structure page loads</td><td>1. Navigate to /salary/structure</td><td>Salary structures displayed</td><td></td></tr>
+            <tr><td class="test-id">SAL-002</td><td>Salary report loads</td><td>1. Navigate to /salary/report</td><td>Salary report displayed</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <!-- MODULE 10: REPORTS & SETTINGS -->
+    <h2>MODULE 10: REPORTS</h2>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">RPT-001</td><td>Sales report loads</td><td>1. Navigate to /reports/sales</td><td>Sales analytics displayed</td><td></td></tr>
+            <tr><td class="test-id">RPT-002</td><td>Expense report loads</td><td>1. Navigate to /reports/expense</td><td>Expense analytics displayed</td><td></td></tr>
+            <tr><td class="test-id">RPT-003</td><td>Revenue report loads</td><td>1. Navigate to /reports/revenue</td><td>Revenue analytics displayed</td><td></td></tr>
+            <tr><td class="test-id">RPT-004</td><td>Stock report loads</td><td>1. Navigate to /reports/stock</td><td>Stock levels displayed</td><td></td></tr>
+            <tr><td class="test-id">RPT-005</td><td>Purchase report loads</td><td>1. Navigate to /reports/purchase</td><td>Purchase analytics displayed</td><td></td></tr>
+            <tr><td class="test-id">RPT-006</td><td>Return history loads</td><td>1. Navigate to /reports/returns</td><td>Return records displayed</td><td></td></tr>
+            <tr><td class="test-id">RPT-007</td><td>VAT report loads</td><td>1. Navigate to /reports/vat</td><td>VAT calculations displayed</td><td></td></tr>
+            <tr><td class="test-id">RPT-008</td><td>Services report loads</td><td>1. Navigate to /reports/services</td><td>Services analytics displayed</td><td></td></tr>
+            <tr><td class="test-id">RPT-009</td><td>Profit/Loss report loads</td><td>1. Navigate to /reports/profitloss</td><td>P&L statement displayed</td><td></td></tr>
+            <tr><td class="test-id">RPT-010</td><td>Export report to CSV</td><td>1. Open any report<br>2. Click export</td><td>CSV downloaded</td><td></td></tr>
+            <tr><td class="test-id">RPT-011</td><td>Filter reports by date</td><td>1. Set date range<br>2. Apply</td><td>Report filtered</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <h2>MODULE 11: SETTINGS</h2>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">SET-001</td><td>Shop info page loads</td><td>1. Navigate to /settings/shop</td><td>Shop settings form displayed</td><td></td></tr>
+            <tr><td class="test-id">SET-002</td><td>Update shop name</td><td>1. Change shop name<br>2. Save</td><td>Name updated</td><td></td></tr>
+            <tr><td class="test-id">SET-003</td><td>Users page loads</td><td>1. Navigate to /settings/users</td><td>User list displayed</td><td></td></tr>
+            <tr><td class="test-id">SET-004</td><td>Add new user</td><td>1. Click Add<br>2. Fill user details<br>3. Save</td><td>User created</td><td></td></tr>
+            <tr><td class="test-id">SET-005</td><td>Delete user</td><td>1. Delete<br>2. Confirm</td><td>User deleted</td><td></td></tr>
+            <tr><td class="test-id">SET-006</td><td>Profile page loads</td><td>1. Navigate to /settings/profile</td><td>Current user profile displayed</td><td></td></tr>
+            <tr><td class="test-id">SET-007</td><td>Update profile</td><td>1. Change name/email<br>2. Save</td><td>Profile updated</td><td></td></tr>
+            <tr><td class="test-id">SET-008</td><td>Backup page loads</td><td>1. Navigate to /settings/backup</td><td>Backup options displayed</td><td></td></tr>
+            <tr><td class="test-id">SET-009</td><td>Create backup</td><td>1. Click "Create Backup"</td><td>Backup file generated</td><td></td></tr>
+            <tr><td class="test-id">SET-010</td><td>Recycle bin loads</td><td>1. Navigate to /settings/recycle-bin</td><td>Deleted items displayed</td><td></td></tr>
+            <tr><td class="test-id">SET-011</td><td>Restore deleted item</td><td>1. Select item<br>2. Click "Restore"</td><td>Item restored</td><td></td></tr>
+            <tr><td class="test-id">VAT-001</td><td>VAT rates page loads</td><td>1. Navigate to /vat/rates</td><td>VAT rates configuration displayed</td><td></td></tr>
+            <tr><td class="test-id">VAT-002</td><td>Add VAT rate</td><td>1. Click Add<br>2. Fill: Category, Rate<br>3. Save</td><td>VAT rate created</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <h2>MODULE 12: NAVIGATION & UI</h2>
+    <table>
+        <thead>
+            <tr>
+                <th class="test-id">Test Case ID</th>
+                <th>Test Scenario / Description</th>
+                <th class="steps">Steps to Perform</th>
+                <th class="expected">Expected Result</th>
+                <th class="actual">Actual Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="test-id">NAV-001</td><td>Sidebar navigation</td><td>1. Click each menu item</td><td>Navigates to correct page</td><td></td></tr>
+            <tr><td class="test-id">NAV-002</td><td>Sidebar collapse/expand</td><td>1. Click collapse button</td><td>Sidebar collapses/expands</td><td></td></tr>
+            <tr><td class="test-id">NAV-003</td><td>Header user menu</td><td>1. Click user avatar</td><td>Dropdown with profile/logout shown</td><td></td></tr>
+            <tr><td class="test-id">NAV-004</td><td>Protected routes</td><td>1. Logout<br>2. Try to access /dashboard directly</td><td>Redirected to login</td><td></td></tr>
+            <tr><td class="test-id">NAV-005</td><td>Toast notifications</td><td>1. Perform action (save/delete)</td><td>Toast message appears and auto-dismisses</td><td></td></tr>
+            <tr><td class="test-id">NAV-006</td><td>Confirm dialog cancel</td><td>1. Trigger delete<br>2. Click Cancel</td><td>Dialog closes, no action taken</td><td></td></tr>
+            <tr><td class="test-id">NAV-007</td><td>Confirm dialog confirm</td><td>1. Trigger delete<br>2. Click Confirm</td><td>Action executed</td><td></td></tr>
+            <tr><td class="test-id">NAV-008</td><td>Loading states</td><td>1. Trigger data load</td><td>Loading spinner/skeleton shown</td><td></td></tr>
+            <tr><td class="test-id">NAV-009</td><td>Error handling</td><td>1. Disconnect network<br>2. Try action</td><td>Error message displayed</td><td></td></tr>
+            <tr><td class="test-id">NAV-010</td><td>Responsive design</td><td>1. Resize browser window</td><td>Layout adapts to screen size</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <!-- SUMMARY -->
+    <h2>TEST SUMMARY</h2>
+    <table class="summary-table">
+        <thead>
+            <tr>
+                <th>Module</th>
+                <th>Test Cases</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Authentication</td><td>13</td></tr>
+            <tr><td>Dashboard</td><td>6</td></tr>
+            <tr><td>Sales Management</td><td>42</td></tr>
+            <tr><td>Purchase Management</td><td>21</td></tr>
+            <tr><td>Clients & Pets</td><td>16</td></tr>
+            <tr><td>Appointments</td><td>18</td></tr>
+            <tr><td>Services</td><td>15</td></tr>
+            <tr><td>Suppliers</td><td>10</td></tr>
+            <tr><td>Expenses & Salary</td><td>11</td></tr>
+            <tr><td>Reports</td><td>11</td></tr>
+            <tr><td>Settings & VAT</td><td>13</td></tr>
+            <tr><td>Navigation & UI</td><td>10</td></tr>
+            <tr style="background:#002366; color:white; font-weight:bold;"><td>TOTAL</td><td>186+</td></tr>
+        </tbody>
+    </table>
+
+    <div class="notes">
+        <h3>Notes for Testers</h3>
+        <ol>
+            <li><strong>Prerequisites:</strong> Ensure PostgreSQL is running and database is migrated</li>
+            <li><strong>Test Data:</strong> Create test data before running negative tests</li>
+            <li><strong>Browser:</strong> Test on Chrome, Firefox, Safari for cross-browser compatibility</li>
+            <li><strong>Network:</strong> Test offline scenarios for error handling</li>
+            <li><strong>Sequence:</strong> Run authentication tests first, then other modules</li>
+            <li><strong>Clean Up:</strong> Delete test data after testing to maintain clean state</li>
+        </ol>
+    </div>
+
+    <div style="text-align:center; margin-top:30px; padding-top:20px; border-top:2px solid #002366; color:#666; font-size:10px;">
+        <p>Furry Friends POS System - Manual Test Cases Document</p>
+        <p>Generated for Quality Assurance Testing</p>
+    </div>
+</body>
+</html>

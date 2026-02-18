@@ -17,6 +17,8 @@ import {
   UserCheck,
   Users,
 } from "lucide-react"
+import { useToast } from "@/components/common/Toast"
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
 type Schedule = {
   id: string
@@ -65,6 +67,8 @@ const STATUS_TONES: Record<Schedule["status"], string> = {
 const getStatusTone = (status: Schedule["status"]) => STATUS_TONES[status] || "border-slate-200 bg-slate-50 text-slate-600"
 
 export default function StaffSchedule() {
+  const toast = useToast()
+  const [deleteScheduleId, setDeleteScheduleId] = useState<string | null>(null)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0])
   const [searchStaff, setSearchStaff] = useState("")
@@ -195,18 +199,26 @@ export default function StaffSchedule() {
         ])
       }
       setOpen(false)
+      toast.success(editing ? "Schedule updated successfully" : "Schedule created successfully")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to save schedule")
+      toast.error(e instanceof Error ? e.message : "Failed to save schedule")
     }
   }
 
-  async function deleteSchedule(id: string) {
-    if (!confirm("Delete this schedule?")) return
+  function handleDeleteScheduleClick(id: string) {
+    setDeleteScheduleId(id)
+  }
+
+  async function handleDeleteScheduleConfirm() {
+    if (!deleteScheduleId) return
     try {
-      await apiDelete(`/api/staff-schedules/${id}`)
-      setSchedules((prev) => prev.filter((s) => s.id !== id))
+      await apiDelete(`/api/staff-schedules/${deleteScheduleId}`)
+      setSchedules((prev) => prev.filter((s) => s.id !== deleteScheduleId))
+      toast.success("Schedule deleted successfully")
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to delete schedule")
+      toast.error(e instanceof Error ? e.message : "Failed to delete schedule")
+    } finally {
+      setDeleteScheduleId(null)
     }
   }
 
@@ -451,7 +463,7 @@ export default function StaffSchedule() {
                             <Button size="sm" variant="outline" className="rounded-2xl border-border/60" onClick={() => openEdit(s)}>
                               Edit
                             </Button>
-                            <Button size="sm" variant="destructive" className="rounded-2xl" onClick={() => deleteSchedule(s.id)}>
+                            <Button size="sm" variant="destructive" className="rounded-2xl" onClick={() => handleDeleteScheduleClick(s.id)}>
                               Delete
                             </Button>
                           </div>
@@ -527,6 +539,15 @@ export default function StaffSchedule() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteScheduleId !== null}
+        onOpenChange={(open) => !open && setDeleteScheduleId(null)}
+        title="Delete Schedule"
+        description="Are you sure you want to delete this schedule? This action cannot be undone."
+        onConfirm={handleDeleteScheduleConfirm}
+        variant="danger"
+      />
     </>
   )
 }
