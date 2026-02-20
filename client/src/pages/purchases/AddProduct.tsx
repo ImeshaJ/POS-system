@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import PageTitle from "@/components/common/PageTitle"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Package, Boxes, Tag, Barcode, Printer, RefreshCcw, Plus, Trash2, Undo2, TrendingUp, AlertTriangle } from "lucide-react"
+import { Package, Boxes, Tag, Barcode, Printer, RefreshCcw, Plus, Trash2, Undo2, TrendingUp, AlertTriangle, Download, FileText, FileSpreadsheet } from "lucide-react"
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api"
 import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 import { useToast } from "@/components/common/Toast"
@@ -47,6 +47,32 @@ type ApiProduct = {
 type ApiSupplier = {
   id: number
   name: string
+}
+
+type ProductLabel = {
+  id: number
+  product_id: number | null
+  label_code: string
+  product_code: string
+  product_name: string
+  selling_price: number
+  expiry_date: string
+  supplier_name: string
+  printed_at: string
+  created_at: string
+}
+
+type LabelReportData = {
+  labels: ProductLabel[]
+  summary: {
+    total_labels: number
+    unique_products: number
+    unique_suppliers: number
+    total_retail_value: number
+    earliest_label: string
+    latest_label: string
+  }
+  generatedAt: string
 }
 
 const formatCurrency = (value: number) =>
@@ -95,6 +121,9 @@ const AddProduct = () => {
   const [newCategory, setNewCategory] = useState("")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<number | null>(null)
+  const [generatedLabels, setGeneratedLabels] = useState<ProductLabel[]>([])
+  const [labelsLoading, setLabelsLoading] = useState(false)
+  const [reportLoading, setReportLoading] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
@@ -136,6 +165,22 @@ const AddProduct = () => {
     window.addEventListener("click", closeSuggestions)
     return () => window.removeEventListener("click", closeSuggestions)
   }, [])
+
+  const fetchLabels = useCallback(async () => {
+    try {
+      setLabelsLoading(true)
+      const response = await apiGet<ProductLabel[]>("/api/product-labels?limit=100")
+      setGeneratedLabels(response.data || [])
+    } catch (err) {
+      console.error("Failed to fetch labels:", err)
+    } finally {
+      setLabelsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchLabels()
+  }, [fetchLabels])
 
   const mapProductRow = (row: ApiProduct, supplierMap: Map<number, string>): ProductItem => {
     const today = new Date().toISOString().split("T")[0]
@@ -290,10 +335,16 @@ const AddProduct = () => {
     }
   }
 
-  const handlePrintLabel = (productId?: number) => {
+  const handlePrintLabel = async (productId?: number, existingLabel?: ProductLabel) => {
+    // If printing an existing label, use its data directly
+    if (existingLabel) {
+      printLabelsToWindow([existingLabel])
+      return
+    }
+
     let productToPrint: ProductItem | undefined = productId
       ? products.find((p) => p.id === productId)
-      : undefined;
+      : undefined
 
     // Allow printing even if all fields are empty
     if (!productToPrint) {
@@ -311,27 +362,61 @@ const AddProduct = () => {
         reorderLevel: Number(reorderLevel),
         supplier,
         quantity,
-      };
+      }
     }
 
-    const labelsHTML = Array.from({ length: labelQty })
+    // Generate unique labels via API
+    try {
+      setLabelsLoading(true)
+      const response = await apiPost<ProductLabel[]>("/api/product-labels/generate", {
+        product_id: productToPrint.id > 0 ? productToPrint.id : null,
+        quantity: labelQty,
+        product_code: productToPrint.code,
+        product_name: productToPrint.name,
+        selling_price: productToPrint.sellingPrice,
+        expiry_date: productToPrint.expiryDate || null,
+        supplier_name: productToPrint.supplier || supplier,
+      })
+
+      const newLabels = response.data || []
+      if (newLabels.length === 0) {
+        toast.warning("No labels were generated")
+        return
+      }
+
+      // Update local state with new labels
+      setGeneratedLabels((prev) => [...newLabels, ...prev])
+
+      // Print the labels
+      printLabelsToWindow(newLabels)
+
+      toast.success(`${newLabels.length} unique label(s) generated and sent to print`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to generate labels")
+    } finally {
+      setLabelsLoading(false)
+    }
+  }
+
+  const printLabelsToWindow = (labels: ProductLabel[]) => {
+    const labelsHTML = labels
       .map(
-        (_, i) => `
+        (label, i) => `
         <div class="label">
-          <h3>${productToPrint!.name}</h3>
-          <p>Code: ${productToPrint!.code}</p>
+          <h3>${label.product_name || "Product"}</h3>
+          <p class="label-code"><strong>${label.label_code}</strong></p>
           <svg id="barcode-${i}"></svg>
-          <p>Price: Rs. ${productToPrint!.sellingPrice}</p>
-          <p>EXP: ${productToPrint!.expiryDate}</p>
+          <p>Price: Rs. ${Number(label.selling_price || 0).toLocaleString()}</p>
+          ${label.expiry_date ? `<p>EXP: ${label.expiry_date}</p>` : ""}
         </div>
       `
       )
-      .join("");
+      .join("")
 
-    const win = window.open("", "_blank", "width=800,height=600");
+    const win = window.open("", "_blank", "width=800,height=600")
     if (!win) {
-      toast.warning("Unable to open print window. Please allow popups for this site.");
-      return;
+      toast.warning("Unable to open print window. Please allow popups for this site.")
+      return
     }
 
     win.document.write(`
@@ -357,7 +442,7 @@ const AddProduct = () => {
             }
             .label {
               width: 260px;
-              min-height: 120px;
+              min-height: 140px;
               max-width: 260px;
               display: flex;
               flex-direction: column;
@@ -381,9 +466,14 @@ const AddProduct = () => {
               word-break: break-word;
             }
             p {
-              font-size: 12px;
+              font-size: 11px;
               margin: 3px 0;
               word-break: break-word;
+            }
+            .label-code {
+              font-size: 10px;
+              color: #333;
+              font-family: monospace;
             }
             svg {
               margin: 6px 0;
@@ -406,13 +496,13 @@ const AddProduct = () => {
             ${labelsHTML}
           </div>
           <script>
-            ${Array.from({ length: labelQty })
+            ${labels
               .map(
-                (_, i) => `
-                JsBarcode("#barcode-${i}", "${productToPrint!.code}", {
+                (label, i) => `
+                JsBarcode("#barcode-${i}", "${label.label_code}", {
                   format: "CODE128",
-                  width: 2,
-                  height: 40,
+                  width: 1.5,
+                  height: 35,
                   displayValue: false
                 });
               `
@@ -423,9 +513,207 @@ const AddProduct = () => {
           </script>
         </body>
       </html>
-    `);
+    `)
 
-    win.document.close();
+    win.document.close()
+  }
+
+  const handleDownloadReport = async (format: "pdf" | "excel") => {
+    try {
+      setReportLoading(true)
+      const response = await apiGet<LabelReportData>("/api/product-labels/report/data")
+      const reportData = response.data
+
+      if (!reportData || !reportData.labels || reportData.labels.length === 0) {
+        toast.warning("No label data available for report")
+        return
+      }
+
+      if (format === "excel") {
+        downloadExcelReport(reportData)
+      } else {
+        downloadPdfReport(reportData)
+      }
+
+      toast.success(`Report downloaded successfully as ${format.toUpperCase()}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to generate report")
+    } finally {
+      setReportLoading(false)
+    }
+  }
+
+  const downloadExcelReport = (reportData: LabelReportData) => {
+    const headers = [
+      "Label Code",
+      "Product Code",
+      "Product Name",
+      "Category",
+      "Selling Price (Rs.)",
+      "Expiry Date",
+      "Supplier",
+      "Generated At",
+    ]
+
+    const rows = reportData.labels.map((label) => [
+      label.label_code,
+      label.product_code || "-",
+      label.product_name || "-",
+      "-",
+      label.selling_price || 0,
+      label.expiry_date || "-",
+      label.supplier_name || "-",
+      new Date(label.created_at).toLocaleString(),
+    ])
+
+    // Summary rows
+    const summaryRows = [
+      [],
+      ["REPORT SUMMARY"],
+      ["Total Labels", reportData.summary.total_labels],
+      ["Unique Products", reportData.summary.unique_products],
+      ["Unique Suppliers", reportData.summary.unique_suppliers],
+      ["Total Retail Value", `Rs. ${Number(reportData.summary.total_retail_value || 0).toLocaleString()}`],
+      ["Report Generated", new Date(reportData.generatedAt).toLocaleString()],
+    ]
+
+    const csv = [
+      headers.join(","),
+      ...rows.map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+      ),
+      ...summaryRows.map((row) =>
+        row.map((cell) => `"${String(cell || "").replace(/"/g, '""')}"`).join(",")
+      ),
+    ].join("\n")
+
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `Product_Labels_Report_${new Date().toISOString().split("T")[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const downloadPdfReport = (reportData: LabelReportData) => {
+    const win = window.open("", "_blank", "width=900,height=700")
+    if (!win) {
+      toast.warning("Unable to open print window. Please allow popups for this site.")
+      return
+    }
+
+    const tableRows = reportData.labels
+      .map(
+        (label) => `
+        <tr>
+          <td style="font-family: monospace; font-size: 11px;">${label.label_code}</td>
+          <td>${label.product_code || "-"}</td>
+          <td>${label.product_name || "-"}</td>
+          <td style="text-align: right;">Rs. ${Number(label.selling_price || 0).toLocaleString()}</td>
+          <td>${label.expiry_date || "-"}</td>
+          <td>${label.supplier_name || "-"}</td>
+          <td style="font-size: 10px;">${new Date(label.created_at).toLocaleString()}</td>
+        </tr>
+      `
+      )
+      .join("")
+
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Product Labels Report</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; padding: 20px; background: #fff; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #1d4ed8; padding-bottom: 20px; }
+            .header h1 { color: #0f172a; font-size: 24px; margin-bottom: 5px; }
+            .header p { color: #64748b; font-size: 12px; }
+            .summary { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 30px; }
+            .summary-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; flex: 1; min-width: 150px; }
+            .summary-item .label { font-size: 11px; color: #64748b; text-transform: uppercase; }
+            .summary-item .value { font-size: 20px; font-weight: bold; color: #0f172a; margin-top: 5px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { background: #1d4ed8; color: white; padding: 10px 8px; text-align: left; font-weight: 600; }
+            td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+            tr:nth-child(even) { background: #f8fafc; }
+            tr:hover { background: #eff6ff; }
+            .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+            @media print {
+              body { padding: 10px; }
+              .summary-item { page-break-inside: avoid; }
+              table { page-break-inside: auto; }
+              tr { page-break-inside: avoid; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Product Labels Report</h1>
+            <p>Generated on ${new Date(reportData.generatedAt).toLocaleString()}</p>
+          </div>
+
+          <div class="summary">
+            <div class="summary-item">
+              <div class="label">Total Labels</div>
+              <div class="value">${reportData.summary.total_labels}</div>
+            </div>
+            <div class="summary-item">
+              <div class="label">Unique Products</div>
+              <div class="value">${reportData.summary.unique_products}</div>
+            </div>
+            <div class="summary-item">
+              <div class="label">Unique Suppliers</div>
+              <div class="value">${reportData.summary.unique_suppliers}</div>
+            </div>
+            <div class="summary-item">
+              <div class="label">Total Retail Value</div>
+              <div class="value">Rs. ${Number(reportData.summary.total_retail_value || 0).toLocaleString()}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Label Code</th>
+                <th>Product Code</th>
+                <th>Product Name</th>
+                <th style="text-align: right;">Price</th>
+                <th>Expiry</th>
+                <th>Supplier</th>
+                <th>Generated</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <p>Furry Friends POS System - Product Labels Report</p>
+          </div>
+
+          <script>
+            window.print();
+          </script>
+        </body>
+      </html>
+    `)
+
+    win.document.close()
+  }
+
+  const handleDeleteLabel = async (labelId: number) => {
+    try {
+      await apiDelete(`/api/product-labels/${labelId}`)
+      setGeneratedLabels((prev) => prev.filter((l) => l.id !== labelId))
+      toast.success("Label deleted successfully")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete label")
+    }
   }
 
   const totalValue = products.reduce((sum, p) => sum + p.costPrice * p.quantity, 0)
@@ -450,8 +738,29 @@ const AddProduct = () => {
                   <h2 className="text-3xl font-bold">Add New Product</h2>
                   <p className="text-sm text-white/80">Capture supplier info, catalog specs, and pricing in one flow.</p>
                 </div>
-                <div className="rounded-3xl bg-white/10 p-3">
-                  <Package className="h-10 w-10 text-white" />
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      onClick={() => handleDownloadReport("pdf")}
+                      disabled={reportLoading}
+                      className="h-9 rounded-2xl bg-white/90 px-4 text-[#0f172a] hover:bg-white text-sm"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Download PDF
+                    </Button>
+                    <Button
+                      onClick={() => handleDownloadReport("excel")}
+                      disabled={reportLoading}
+                      variant="outline"
+                      className="h-9 rounded-2xl border-white/60 text-white hover:bg-white/10 text-sm"
+                    >
+                      <FileSpreadsheet className="mr-2 h-4 w-4" />
+                      Download Excel
+                    </Button>
+                  </div>
+                  <div className="rounded-3xl bg-white/10 p-3">
+                    <Package className="h-10 w-10 text-white" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -754,10 +1063,11 @@ const AddProduct = () => {
               <div className="space-y-3">
                 <Button
                   onClick={() => handlePrintLabel()}
+                  disabled={labelsLoading}
                   className="h-11 w-full bg-[#6d28d9] text-white hover:bg-[#5b21b6]"
                 >
                   <Printer className="mr-2 h-4 w-4" />
-                  Print Labels
+                  {labelsLoading ? "Generating..." : "Print Labels"}
                 </Button>
                 <Button variant="outline" onClick={resetForm} className="h-11 w-full">
                   Clear Form
@@ -765,11 +1075,136 @@ const AddProduct = () => {
               </div>
 
               <div className="rounded-2xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">
-                <p>Need to relabel an existing SKU? Use the actions in the table below to print directly from the catalog.</p>
+                <p>Each label gets a <strong>unique code</strong> stored in the database. Labels can be reprinted from the table below.</p>
+              </div>
+
+              <div className="space-y-3 pt-4 border-t border-gray-200">
+                <div className="flex items-center gap-2">
+                  <Download className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-semibold text-gray-700">Download Report</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDownloadReport("pdf")}
+                    disabled={reportLoading}
+                    className="h-10 text-xs"
+                  >
+                    <FileText className="mr-1 h-3.5 w-3.5" />
+                    PDF Report
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDownloadReport("excel")}
+                    disabled={reportLoading}
+                    className="h-10 text-xs"
+                  >
+                    <FileSpreadsheet className="mr-1 h-3.5 w-3.5" />
+                    Excel Report
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Export all generated labels with product details, pricing, and supplier info.
+                </p>
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {generatedLabels.length > 0 && (
+          <Card className="brand-card brand-card-hover">
+            <CardContent className="space-y-4 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="rounded-2xl bg-purple-100 p-2 text-purple-600">
+                    <Tag className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-gray-500">Generated Labels</p>
+                    <h3 className="text-lg font-bold text-gray-900">{generatedLabels.length} unique label(s)</h3>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchLabels}
+                    className="h-8 text-xs"
+                  >
+                    <RefreshCcw className="mr-1 h-3.5 w-3.5" />
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-linear-to-r from-[#f5f3ff] to-[#ede9fe]">
+                      <th className="px-4 py-3 text-left font-semibold uppercase tracking-wide text-gray-600">Label Code</th>
+                      <th className="px-4 py-3 text-left font-semibold uppercase tracking-wide text-gray-600">Product</th>
+                      <th className="px-4 py-3 text-right font-semibold uppercase tracking-wide text-gray-600">Price</th>
+                      <th className="px-4 py-3 text-center font-semibold uppercase tracking-wide text-gray-600">Expiry</th>
+                      <th className="px-4 py-3 text-center font-semibold uppercase tracking-wide text-gray-600">Supplier</th>
+                      <th className="px-4 py-3 text-center font-semibold uppercase tracking-wide text-gray-600">Generated</th>
+                      <th className="px-4 py-3 text-center font-semibold uppercase tracking-wide text-gray-600">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {generatedLabels.slice(0, 50).map((label, idx) => (
+                      <tr
+                        key={label.id}
+                        className={`${idx % 2 === 0 ? "bg-white" : "bg-slate-50"} border-b border-gray-100 transition hover:bg-purple-50/60`}
+                      >
+                        <td className="px-4 py-3 font-mono text-xs text-purple-700 font-semibold">{label.label_code}</td>
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-gray-900">{label.product_name || "-"}</p>
+                          <p className="text-xs text-gray-500">{label.product_code || "-"}</p>
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-emerald-600">
+                          {formatCurrency(Number(label.selling_price || 0))}
+                        </td>
+                        <td className="px-4 py-3 text-center text-gray-600 text-xs">{label.expiry_date || "-"}</td>
+                        <td className="px-4 py-3 text-center text-gray-600 text-xs">{label.supplier_name || "-"}</td>
+                        <td className="px-4 py-3 text-center text-gray-500 text-xs">
+                          {new Date(label.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap justify-center gap-1">
+                            <Button
+                              onClick={() => handlePrintLabel(undefined, label)}
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs px-2"
+                              title="Reprint this label"
+                            >
+                              <Printer className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteLabel(label.id)}
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs px-2 text-rose-600 hover:text-rose-700"
+                              title="Delete label"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {generatedLabels.length > 50 && (
+                <p className="text-center text-xs text-gray-500">
+                  Showing 50 of {generatedLabels.length} labels. Download the full report for complete data.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {products.length > 0 && (
           <Card className="brand-card brand-card-hover">

@@ -40,6 +40,7 @@ type Appointment = {
   clientId?: string
   pet: string
   petType: string
+  animalType: string
   age: string
   weight: string
   lastVisit: string
@@ -50,6 +51,8 @@ type Appointment = {
   attachments: Attachment[]
 }
 
+const ANIMAL_TYPES = ["Cat", "Dog", "Bird", "Rabbit", "Other"] as const
+
 type ApiAppointment = {
   id: number
   date: string
@@ -59,6 +62,7 @@ type ApiAppointment = {
   client_code?: string | null
   pet_name?: string
   pet_type?: string
+  animal_type?: string
   age?: string
   weight?: string
   last_visit?: string
@@ -105,7 +109,18 @@ const isGroomingReason = (value?: string | null) => {
 }
 
 const formatReason = (value?: string | null) => {
-  return value?.trim() || "Not specified"
+  if (!value) return "Not specified"
+  const trimmed = value.trim()
+  // Show "Boarding" instead of "Cat Boarding" or "Dog Boarding"
+  if (/^(cat|dog)\s*boarding$/i.test(trimmed)) {
+    return "Boarding"
+  }
+  return trimmed
+}
+
+const isBoardingReason = (value?: string | null) => {
+  if (!value) return false
+  return /boarding/i.test(value)
 }
 
 const mapApiAppointment = (api: ApiAppointment, fallback?: FormState): Appointment => {
@@ -119,6 +134,7 @@ const mapApiAppointment = (api: ApiAppointment, fallback?: FormState): Appointme
       (api.client_id ? String(api.client_id) : fallback?.clientId || ""),
     pet: api.pet_name || fallback?.pet || "",
     petType: api.pet_type || fallback?.petType || "",
+    animalType: api.animal_type || fallback?.animalType || "",
     age: api.age || fallback?.age || "",
     weight: api.weight || fallback?.weight || "",
     lastVisit: normalizeDateString(api.last_visit) || fallback?.lastVisit || "",
@@ -137,6 +153,7 @@ const toFormState = (appointment: Appointment): FormState => ({
   clientId: appointment.clientId || "",
   pet: appointment.pet,
   petType: appointment.petType,
+  animalType: appointment.animalType,
   age: appointment.age,
   weight: appointment.weight,
   lastVisit: appointment.lastVisit,
@@ -154,6 +171,7 @@ const createEmptyForm = (): FormState => ({
   clientId: "",
   pet: "",
   petType: "",
+  animalType: "",
   age: "",
   weight: "",
   lastVisit: "",
@@ -309,6 +327,7 @@ export default function AppointmentListConsolidated() {
       client_name: editingData.client,
       pet_name: editingData.pet,
       pet_type: editingData.petType,
+      animal_type: editingData.animalType || null,
       age: editingData.age,
       weight: editingData.weight,
       last_visit: editingData.lastVisit,
@@ -502,7 +521,7 @@ export default function AppointmentListConsolidated() {
               <div className="brand-soft-panel rounded-2xl border border-border/40 p-5">
                 <div className="mb-3 flex items-center justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Doctors</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Veterinarians</p>
                     <h3 className="text-lg font-semibold text-foreground">Lead clinicians</h3>
                   </div>
                   <Users className="h-5 w-5 text-muted-foreground" />
@@ -520,7 +539,7 @@ export default function AppointmentListConsolidated() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No doctor weighting available.</p>
+                  <p className="text-sm text-muted-foreground">No veterinarian data available.</p>
                 )}
               </div>
 
@@ -560,7 +579,7 @@ export default function AppointmentListConsolidated() {
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Search & filter</p>
                 <h2 className="text-2xl font-bold text-foreground">Scheduling console</h2>
-                <p className="text-sm text-muted-foreground">Slice the roster by client, status, or doctor to react faster.</p>
+                <p className="text-sm text-muted-foreground">Slice the roster by client, status, or veterinarian to react faster.</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -612,7 +631,7 @@ export default function AppointmentListConsolidated() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-foreground">Doctor</Label>
+              <Label className="text-sm font-semibold text-foreground">Veterinarian</Label>
               <select
                 value={filterDoctor}
                 onChange={(e) => setFilterDoctor(e.target.value)}
@@ -707,7 +726,7 @@ export default function AppointmentListConsolidated() {
                       {showVitals && (
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Vitals</th>
                       )}
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Doctor</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Veterinarian</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Reason</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Status</th>
                       {showNotes && (
@@ -731,7 +750,9 @@ export default function AppointmentListConsolidated() {
                         <td className="px-4 py-4 text-sm text-foreground">
                           <div className="font-semibold">{a.client}</div>
                           <div className="text-xs text-muted-foreground">
-                            {a.pet} · {a.clientId || "No ID"}
+                            {a.pet}
+                            {a.animalType && <span className="ml-1 text-primary">({a.animalType})</span>}
+                            {" · "}{a.clientId || "No ID"}
                           </div>
                         </td>
                         {showVitals && (
@@ -748,10 +769,12 @@ export default function AppointmentListConsolidated() {
                               className={`brand-pill border ${
                                 isGroomingReason(a.reason)
                                   ? "border-pink-200 bg-pink-50 text-pink-700"
+                                  : isBoardingReason(a.reason)
+                                  ? "border-purple-200 bg-purple-50 text-purple-700"
                                   : "border-primary/30 bg-primary/5 text-primary"
                               }`}
                             >
-                              {a.reason}
+                              {formatReason(a.reason)}
                             </Badge>
                           ) : (
                             <span className="text-xs text-muted-foreground">Not specified</span>
@@ -869,6 +892,20 @@ export default function AppointmentListConsolidated() {
                   />
                 </div>
                 <div>
+                  <Label>Animal Type <span className="text-red-500">*</span></Label>
+                  <select
+                    value={editingData.animalType}
+                    onChange={(e) => setEditingData({ ...editingData, animalType: e.target.value })}
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md"
+                    disabled={!editMode && !creating}
+                  >
+                    <option value="">Select Animal Type</option>
+                    {ANIMAL_TYPES.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <Label>Age</Label>
                   <Input
                     value={editingData.age}
@@ -893,7 +930,7 @@ export default function AppointmentListConsolidated() {
                   />
                 </div>
                 <div>
-                  <Label>Doctor</Label>
+                  <Label>Veterinarian</Label>
                   <Input
                     value={editingData.doctor}
                     onChange={(e) => setEditingData({ ...editingData, doctor: e.target.value })}

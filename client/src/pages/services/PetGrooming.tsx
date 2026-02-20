@@ -23,7 +23,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react"
-import { apiGet } from "@/lib/api"
+import { apiGet, apiPost, apiPut } from "@/lib/api"
 import { useToast } from "@/components/common/Toast"
 
 interface GroomingPackage {
@@ -33,6 +33,27 @@ interface GroomingPackage {
   description: string
   duration: string
   active: boolean
+}
+
+interface ApiServicePackage {
+  id: number
+  name: string
+  price: string
+  description: string | null
+  duration_days: number
+  duration_hours: number
+  duration_minutes: number
+  status: string
+  service_type_code: string
+}
+
+interface ApiAddOnService {
+  id: number
+  name: string
+  price: string
+  description: string | null
+  status: string
+  service_type_code: string
 }
 
 interface Service {
@@ -65,6 +86,41 @@ type GroomingAppointment = {
   status: AppointmentStatus
   doctor: string
 }
+
+type GroomingDetail = {
+  coatCondition: string
+  skinIssues: string
+  groomingType: string
+  servicesPerformed: string
+  productsUsed: string
+  nextGroomingDate: string
+  specialInstructions: string
+  notes: string
+}
+
+type ApiGroomingSession = {
+  id: number
+  appointment_id: number
+  coat_condition: string | null
+  skin_issues: string | null
+  grooming_type: string | null
+  services_performed: string | null
+  products_used: string | null
+  next_grooming_date: string | null
+  special_instructions: string | null
+  notes: string | null
+}
+
+const createDefaultDetail = (): GroomingDetail => ({
+  coatCondition: "",
+  skinIssues: "",
+  groomingType: "",
+  servicesPerformed: "",
+  productsUsed: "",
+  nextGroomingDate: "",
+  specialInstructions: "",
+  notes: "",
+})
 
 const GROOMING_KEYWORDS = ["groom", "bath", "spa", "trim", "coat", "clip"]
 const STATUS_BADGE_STYLES: Record<AppointmentStatus, string> = {
@@ -166,6 +222,13 @@ export default function PetGrooming() {
   const [dateFilter, setDateFilter] = useState<"all" | "upcoming" | "past">("all")
   const [searchTerm, setSearchTerm] = useState("")
 
+  // Grooming session detail management state
+  const [selectedAppointment, setSelectedAppointment] = useState<GroomingAppointment | null>(null)
+  const [detailForm, setDetailForm] = useState<GroomingDetail>(createDefaultDetail())
+  const [groomingSessionId, setGroomingSessionId] = useState<number | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailSaving, setDetailSaving] = useState(false)
+
   const [formPackage, setFormPackage] = useState<GroomingPackage>({
     id: 0,
     name: "",
@@ -194,9 +257,46 @@ export default function PetGrooming() {
     }
   }, [])
 
+  // Fetch packages from database
+  const fetchPackages = useCallback(async () => {
+    try {
+      const res = await apiGet<ApiServicePackage[]>("/api/service-types/packages/by-type/pet-grooming")
+      if (res.data.length > 0) {
+        setPackages(res.data.map(pkg => ({
+          id: pkg.id,
+          name: pkg.name,
+          price: `Rs. ${parseFloat(pkg.price).toLocaleString()}`,
+          description: pkg.description || "",
+          duration: pkg.duration_hours ? `${pkg.duration_hours} hours` : pkg.duration_minutes ? `${pkg.duration_minutes} mins` : "",
+          active: pkg.status === "active"
+        })))
+      }
+    } catch {
+      // Use default packages if API fails
+    }
+  }, [])
+
+  // Fetch add-on services from database
+  const fetchAddOnServices = useCallback(async () => {
+    try {
+      const res = await apiGet<ApiAddOnService[]>("/api/service-types/addons/by-type/pet-grooming")
+      if (res.data.length > 0) {
+        setAdditionalServices(res.data.map(addon => ({
+          id: addon.id,
+          name: addon.name,
+          price: `Rs. ${parseFloat(addon.price).toLocaleString()}`
+        })))
+      }
+    } catch {
+      // Use default add-on services if API fails
+    }
+  }, [])
+
   useEffect(() => {
     fetchAppointments()
-  }, [fetchAppointments])
+    fetchPackages()
+    fetchAddOnServices()
+  }, [fetchAppointments, fetchPackages, fetchAddOnServices])
 
   const groomingAppointments = useMemo(() => {
     const filtered = appointmentRecords.filter((appt) => isGroomingReason(appt.reason))
@@ -346,10 +446,78 @@ export default function PetGrooming() {
     setSearchTerm("")
   }
 
+  const openGroomingDetail = async (appointment: GroomingAppointment) => {
+    setSelectedAppointment(appointment)
+    setDetailLoading(true)
+    setGroomingSessionId(null)
+    setDetailForm(createDefaultDetail())
+    try {
+      const res = await apiGet<ApiGroomingSession>(`/api/services-extension/grooming-sessions/by-appointment/${appointment.id}`)
+      const data = res.data
+      setGroomingSessionId(data.id)
+      setDetailForm({
+        coatCondition: data.coat_condition || "",
+        skinIssues: data.skin_issues || "",
+        groomingType: data.grooming_type || "",
+        servicesPerformed: data.services_performed || "",
+        productsUsed: data.products_used || "",
+        nextGroomingDate: data.next_grooming_date ? data.next_grooming_date.slice(0, 10) : "",
+        specialInstructions: data.special_instructions || "",
+        notes: data.notes || "",
+      })
+    } catch {
+      // No existing record - use defaults
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const closeGroomingDetail = () => {
+    setSelectedAppointment(null)
+    setDetailForm(createDefaultDetail())
+    setGroomingSessionId(null)
+    setDetailSaving(false)
+  }
+
+  const updateDetailField = <K extends keyof GroomingDetail>(key: K, value: GroomingDetail[K]) => {
+    setDetailForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const saveGroomingDetail = async () => {
+    if (!selectedAppointment) return
+    setDetailSaving(true)
+    try {
+      const payload = {
+        appointment_id: Number(selectedAppointment.id),
+        coat_condition: detailForm.coatCondition,
+        skin_issues: detailForm.skinIssues,
+        grooming_type: detailForm.groomingType,
+        services_performed: detailForm.servicesPerformed,
+        products_used: detailForm.productsUsed,
+        next_grooming_date: detailForm.nextGroomingDate || null,
+        special_instructions: detailForm.specialInstructions,
+        notes: detailForm.notes,
+      }
+      if (groomingSessionId) {
+        await apiPut(`/api/services-extension/grooming-sessions/${groomingSessionId}`, payload)
+        toast.success("Grooming details updated successfully")
+      } else {
+        const res = await apiPost<ApiGroomingSession>("/api/services-extension/grooming-sessions", payload)
+        setGroomingSessionId(res.data.id)
+        toast.success("Grooming details saved successfully")
+      }
+      closeGroomingDetail()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save grooming details")
+    } finally {
+      setDetailSaving(false)
+    }
+  }
+
   const handleExportLedger = () => {
     if (!filteredLedger.length) return
     const csv = [
-      ["Pet", "Client", "Date", "Time", "Status", "Reason", "Doctor"],
+      ["Pet", "Client", "Date", "Time", "Status", "Reason", "Veterinarian"],
       ...filteredLedger.map((entry) => [
         entry.pet,
         entry.client,
@@ -607,7 +775,8 @@ export default function PetGrooming() {
                     <TableHead>Schedule</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Doctor</TableHead>
+                    <TableHead>Veterinarian</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -626,6 +795,11 @@ export default function PetGrooming() {
                         <Badge className={`${STATUS_BADGE_STYLES[appt.status]} border`}>{appt.status}</Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{appt.doctor}</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline" onClick={() => openGroomingDetail(appt)} className="rounded-2xl">
+                          Manage
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -878,7 +1052,7 @@ export default function PetGrooming() {
                   {editingService ? "Update service details" : "Add an additional service"}
                 </CardDescription>
               </div>
-              <button 
+              <button
                 onClick={() => setShowServiceModal(false)}
                 className="text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full p-2 transition-all"
               >
@@ -907,20 +1081,156 @@ export default function PetGrooming() {
                 />
               </div>
               <div className="flex gap-3 justify-end pt-6 border-t-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setShowServiceModal(false)}
                   className="px-6 py-2.5 border-2 hover:bg-gray-100 font-semibold"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  className="bg-linear-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-2.5 font-semibold shadow-lg" 
+                <Button
+                  className="bg-linear-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-2.5 font-semibold shadow-lg"
                   onClick={saveService}
                 >
                   {editingService ? "Update Service" : "Add Service"}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Grooming Detail Modal */}
+      {selectedAppointment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl">
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div>
+                <CardTitle>Grooming session checklist</CardTitle>
+                <CardDescription>
+                  {selectedAppointment.pet} · {selectedAppointment.client}
+                </CardDescription>
+              </div>
+              <button className="text-2xl text-muted-foreground hover:text-foreground" onClick={closeGroomingDetail}>
+                ✕
+              </button>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {detailLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader />
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <Label>Coat condition</Label>
+                      <Select
+                        value={detailForm.coatCondition}
+                        onValueChange={(value) => updateDetailField("coatCondition", value)}
+                      >
+                        <SelectTrigger className="mt-2 rounded-2xl">
+                          <SelectValue placeholder="Select condition" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Excellent">Excellent</SelectItem>
+                          <SelectItem value="Good">Good</SelectItem>
+                          <SelectItem value="Fair">Fair</SelectItem>
+                          <SelectItem value="Poor">Poor</SelectItem>
+                          <SelectItem value="Matted">Matted</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Grooming type</Label>
+                      <Select
+                        value={detailForm.groomingType}
+                        onValueChange={(value) => updateDetailField("groomingType", value)}
+                      >
+                        <SelectTrigger className="mt-2 rounded-2xl">
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Basic Bath">Basic Bath</SelectItem>
+                          <SelectItem value="Full Grooming">Full Grooming</SelectItem>
+                          <SelectItem value="De-shedding">De-shedding</SelectItem>
+                          <SelectItem value="Breed Cut">Breed Cut</SelectItem>
+                          <SelectItem value="Lion Cut">Lion Cut</SelectItem>
+                          <SelectItem value="Puppy Cut">Puppy Cut</SelectItem>
+                          <SelectItem value="Sanitary Trim">Sanitary Trim</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Skin issues</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        placeholder="Note any skin issues, allergies, or sensitivities"
+                        value={detailForm.skinIssues}
+                        onChange={(e) => updateDetailField("skinIssues", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Services performed</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        placeholder="Bath, nail trim, ear cleaning, etc."
+                        value={detailForm.servicesPerformed}
+                        onChange={(e) => updateDetailField("servicesPerformed", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Products used</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        placeholder="Shampoo, conditioner, flea treatment, etc."
+                        value={detailForm.productsUsed}
+                        onChange={(e) => updateDetailField("productsUsed", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Next grooming date</Label>
+                      <Input
+                        type="date"
+                        value={detailForm.nextGroomingDate}
+                        onChange={(e) => updateDetailField("nextGroomingDate", e.target.value)}
+                        className="mt-2 rounded-2xl"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Special instructions</Label>
+                    <textarea
+                      className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                      rows={3}
+                      placeholder="Handle with care, sensitive areas, preferences, etc."
+                      value={detailForm.specialInstructions}
+                      onChange={(e) => updateDetailField("specialInstructions", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Notes</Label>
+                    <textarea
+                      className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                      rows={3}
+                      placeholder="Additional notes or observations"
+                      value={detailForm.notes}
+                      onChange={(e) => updateDetailField("notes", e.target.value)}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={closeGroomingDetail} className="rounded-2xl">
+                      Cancel
+                    </Button>
+                    <Button onClick={saveGroomingDetail} disabled={detailSaving} className="rounded-2xl bg-[#0f172a] text-white">
+                      {detailSaving ? "Saving…" : "Save details"}
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

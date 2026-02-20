@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
+  AlertCircle,
+  Box,
+  CheckCircle2,
   ClipboardCheck,
   Download,
   Edit2,
@@ -21,12 +24,14 @@ import {
   Sparkles,
   Trash2,
   TrendingUp,
+  User,
   X,
   FileText,
 } from "lucide-react"
-import { apiDelete, apiGet } from "@/lib/api"
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api"
 import { useToast } from "@/components/common/Toast"
 import { ConfirmDialog } from "@/components/common/ConfirmDialog"
+import { CageSelectorCompact } from "@/components/cages/CageSelector"
 
 interface BoardingPackage {
   id: number
@@ -41,6 +46,27 @@ interface Service {
   id: number
   name: string
   price: string
+}
+
+interface ApiServicePackage {
+  id: number
+  name: string
+  price: string
+  description: string | null
+  duration_days: number
+  duration_hours: number
+  duration_minutes: number
+  status: string
+  service_type_code: string
+}
+
+interface ApiAddOnService {
+  id: number
+  name: string
+  price: string
+  description: string | null
+  status: string
+  service_type_code: string
 }
 
 type AppointmentStatus = "Scheduled" | "Completed" | "Cancelled" | "No-Show"
@@ -97,6 +123,7 @@ type BoardingDetail = {
   checkInTime: string
   checkOutDate: string
   checkOutTime: string
+  cageNumber: number | null
   vaccinationComplete: boolean
   dewormedComplete: boolean
   hasLice: boolean
@@ -104,6 +131,27 @@ type BoardingDetail = {
   stayItems: string
   allergyNotes: string
   healthConcerns: string
+  feedingInstructions: string
+  emergencyContact: string
+}
+
+type ApiBoardingStay = {
+  id: number
+  appointment_id: number
+  check_in_date: string | null
+  check_in_time: string | null
+  check_out_date: string | null
+  check_out_time: string | null
+  cage_number: number | null
+  vaccination_complete: boolean
+  dewormed_complete: boolean
+  has_lice: boolean
+  has_allergy: boolean
+  stay_items: string | null
+  allergy_notes: string | null
+  health_concerns: string | null
+  feeding_instructions: string | null
+  emergency_contact: string | null
 }
 
 const createDefaultDetail = (): BoardingDetail => ({
@@ -111,6 +159,7 @@ const createDefaultDetail = (): BoardingDetail => ({
   checkInTime: "",
   checkOutDate: "",
   checkOutTime: "",
+  cageNumber: null,
   vaccinationComplete: false,
   dewormedComplete: false,
   hasLice: false,
@@ -118,6 +167,8 @@ const createDefaultDetail = (): BoardingDetail => ({
   stayItems: "",
   allergyNotes: "",
   healthConcerns: "",
+  feedingInstructions: "",
+  emergencyContact: "",
 })
 
 const normalizeDateString = (value?: string | null) => {
@@ -210,6 +261,8 @@ export default function CatBoarding() {
   const [selectedAppointment, setSelectedAppointment] = useState<BoardingAppointment | null>(null)
   const [detailForm, setDetailForm] = useState<BoardingDetail>(createDefaultDetail())
   const [detailSaving, setDetailSaving] = useState(false)
+  const [boardingStayId, setBoardingStayId] = useState<number | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [deletePendingId, setDeletePendingId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "All">("All")
   const [dateFilter, setDateFilter] = useState<"all" | "upcoming" | "past">("all")
@@ -243,9 +296,44 @@ export default function CatBoarding() {
     }
   }, [])
 
+  const fetchPackages = useCallback(async () => {
+    try {
+      const res = await apiGet<ApiServicePackage[]>("/api/service-types/packages/by-type/cat-boarding")
+      if (res.data.length > 0) {
+        setPackages(res.data.map(pkg => ({
+          id: pkg.id,
+          name: pkg.name,
+          price: `Rs. ${parseFloat(pkg.price).toLocaleString()}`,
+          description: pkg.description || "",
+          duration: pkg.duration_days ? `${pkg.duration_days} days` : pkg.duration_hours ? `${pkg.duration_hours} hours` : "",
+          active: pkg.status === "active"
+        })))
+      }
+    } catch {
+      // Use default packages if API fails
+    }
+  }, [])
+
+  const fetchAddOnServices = useCallback(async () => {
+    try {
+      const res = await apiGet<ApiAddOnService[]>("/api/service-types/addons/by-type/cat-boarding")
+      if (res.data.length > 0) {
+        setAdditionalServices(res.data.map(addon => ({
+          id: addon.id,
+          name: addon.name,
+          price: `Rs. ${parseFloat(addon.price).toLocaleString()}`
+        })))
+      }
+    } catch {
+      // Use default services if API fails
+    }
+  }, [])
+
   useEffect(() => {
     fetchAppointments()
-  }, [fetchAppointments])
+    fetchPackages()
+    fetchAddOnServices()
+  }, [fetchAppointments, fetchPackages, fetchAddOnServices])
 
   const boardingAppointments = useMemo(() => {
     const filtered = appointmentRecords.filter((appt) => isBoardingReason(appt.reason))
@@ -315,14 +403,58 @@ export default function CatBoarding() {
     setSearchTerm("")
   }
 
-  const openStayDetail = (appointment: BoardingAppointment) => {
+  const openStayDetail = async (appointment: BoardingAppointment) => {
     setSelectedAppointment(appointment)
-    setDetailForm(stayDetails[appointment.id] ?? createDefaultDetail())
+    setDetailLoading(true)
+    setBoardingStayId(null)
+    setDetailForm(createDefaultDetail())
+    try {
+      const res = await apiGet<ApiBoardingStay>(`/api/services-extension/boarding-stays/by-appointment/${appointment.id}`)
+      const data = res.data
+      setBoardingStayId(data.id)
+      setDetailForm({
+        checkInDate: data.check_in_date ? data.check_in_date.slice(0, 10) : "",
+        checkInTime: data.check_in_time || "",
+        checkOutDate: data.check_out_date ? data.check_out_date.slice(0, 10) : "",
+        checkOutTime: data.check_out_time || "",
+        cageNumber: data.cage_number || null,
+        vaccinationComplete: data.vaccination_complete || false,
+        dewormedComplete: data.dewormed_complete || false,
+        hasLice: data.has_lice || false,
+        hasAllergy: data.has_allergy || false,
+        stayItems: data.stay_items || "",
+        allergyNotes: data.allergy_notes || "",
+        healthConcerns: data.health_concerns || "",
+        feedingInstructions: data.feeding_instructions || "",
+        emergencyContact: data.emergency_contact || "",
+      })
+      setStayDetails((prev) => ({ ...prev, [appointment.id]: {
+        checkInDate: data.check_in_date ? data.check_in_date.slice(0, 10) : "",
+        checkInTime: data.check_in_time || "",
+        checkOutDate: data.check_out_date ? data.check_out_date.slice(0, 10) : "",
+        checkOutTime: data.check_out_time || "",
+        cageNumber: data.cage_number || null,
+        vaccinationComplete: data.vaccination_complete || false,
+        dewormedComplete: data.dewormed_complete || false,
+        hasLice: data.has_lice || false,
+        hasAllergy: data.has_allergy || false,
+        stayItems: data.stay_items || "",
+        allergyNotes: data.allergy_notes || "",
+        healthConcerns: data.health_concerns || "",
+        feedingInstructions: data.feeding_instructions || "",
+        emergencyContact: data.emergency_contact || "",
+      } }))
+    } catch {
+      // No existing record - use defaults
+    } finally {
+      setDetailLoading(false)
+    }
   }
 
   const closeStayDetail = () => {
     setSelectedAppointment(null)
     setDetailForm(createDefaultDetail())
+    setBoardingStayId(null)
     setDetailSaving(false)
   }
 
@@ -330,14 +462,42 @@ export default function CatBoarding() {
     setDetailForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleSaveDetail = () => {
+  const handleSaveDetail = async () => {
     if (!selectedAppointment) return
     setDetailSaving(true)
-    setStayDetails((prev) => ({ ...prev, [selectedAppointment.id]: detailForm }))
-    setTimeout(() => {
-      setDetailSaving(false)
+    try {
+      const payload = {
+        appointment_id: Number(selectedAppointment.id),
+        check_in_date: detailForm.checkInDate || null,
+        check_in_time: detailForm.checkInTime || null,
+        check_out_date: detailForm.checkOutDate || null,
+        check_out_time: detailForm.checkOutTime || null,
+        cage_number: detailForm.cageNumber || null,
+        vaccination_complete: detailForm.vaccinationComplete,
+        dewormed_complete: detailForm.dewormedComplete,
+        has_lice: detailForm.hasLice,
+        has_allergy: detailForm.hasAllergy,
+        stay_items: detailForm.stayItems,
+        allergy_notes: detailForm.allergyNotes,
+        health_concerns: detailForm.healthConcerns,
+        feeding_instructions: detailForm.feedingInstructions,
+        emergency_contact: detailForm.emergencyContact,
+      }
+      if (boardingStayId) {
+        await apiPut(`/api/services-extension/boarding-stays/${boardingStayId}`, payload)
+        toast.success("Boarding details updated successfully")
+      } else {
+        const res = await apiPost<ApiBoardingStay>("/api/services-extension/boarding-stays", payload)
+        setBoardingStayId(res.data.id)
+        toast.success("Boarding details saved successfully")
+      }
+      setStayDetails((prev) => ({ ...prev, [selectedAppointment.id]: detailForm }))
       closeStayDetail()
-    }, 200)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save boarding details")
+    } finally {
+      setDetailSaving(false)
+    }
   }
 
   const handleDeleteBoardingClick = (appointmentId: string) => {
@@ -468,7 +628,7 @@ export default function CatBoarding() {
   const handleExportLedger = () => {
     if (!filteredLedger.length) return
     const csv = [
-      ["Pet", "Client", "Date", "Time", "Status", "Reason", "Doctor"],
+      ["Pet", "Client", "Date", "Time", "Status", "Reason", "Veterinarian"],
       ...filteredLedger.map((entry) => [
         entry.pet,
         entry.client,
@@ -829,9 +989,10 @@ export default function CatBoarding() {
                   <TableRow>
                     <TableHead>Pet · Client</TableHead>
                     <TableHead>Schedule</TableHead>
+                    <TableHead>Cage</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Doctor</TableHead>
+                    <TableHead>Veterinarian</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -847,6 +1008,16 @@ export default function CatBoarding() {
                           <p>{appt.date || "Date TBD"}</p>
                           <p className="text-xs text-muted-foreground">{appt.time || "—"}</p>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {stayDetails[appt.id]?.cageNumber ? (
+                          <Badge className="bg-purple-100 text-purple-700 border-purple-200">
+                            <Box className="h-3 w-3 mr-1" />
+                            C{stayDetails[appt.id].cageNumber}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Not assigned</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{appt.reason || "—"}</TableCell>
                       <TableCell>
@@ -1003,104 +1174,213 @@ export default function CatBoarding() {
               </button>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <Label>Check-in date</Label>
-                  <Input
-                    type="date"
-                    value={detailForm.checkInDate}
-                    onChange={(event) => updateDetailField("checkInDate", event.target.value)}
-                    className="rounded-2xl"
-                  />
+              {detailLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader />
                 </div>
-                <div>
-                  <Label>Check-in time</Label>
-                  <Input
-                    type="time"
-                    value={detailForm.checkInTime}
-                    onChange={(event) => updateDetailField("checkInTime", event.target.value)}
-                    className="rounded-2xl"
-                  />
-                </div>
-                <div>
-                  <Label>Check-out date</Label>
-                  <Input
-                    type="date"
-                    value={detailForm.checkOutDate}
-                    onChange={(event) => updateDetailField("checkOutDate", event.target.value)}
-                    className="rounded-2xl"
-                  />
-                </div>
-                <div>
-                  <Label>Check-out time</Label>
-                  <Input
-                    type="time"
-                    value={detailForm.checkOutTime}
-                    onChange={(event) => updateDetailField("checkOutTime", event.target.value)}
-                    className="rounded-2xl"
-                  />
-                </div>
-              </div>
+              ) : (
+                <>
+                  {/* Summary Box */}
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    {/* Filled Details */}
+                    <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        <h4 className="font-semibold text-green-900">Filled Details</h4>
+                      </div>
+                      <ul className="space-y-1 text-sm text-green-800">
+                        {detailForm.checkInDate && <li>Check-in: {detailForm.checkInDate}</li>}
+                        {detailForm.checkOutDate && <li>Check-out: {detailForm.checkOutDate}</li>}
+                        {detailForm.cageNumber && <li>Cage: C{detailForm.cageNumber}</li>}
+                        {detailForm.vaccinationComplete && <li>Vaccination verified</li>}
+                        {detailForm.dewormedComplete && <li>Deworming verified</li>}
+                        {detailForm.emergencyContact && <li>Emergency contact set</li>}
+                        {detailForm.feedingInstructions && <li>Feeding instructions added</li>}
+                        {!detailForm.checkInDate && !detailForm.checkOutDate && !detailForm.cageNumber && (
+                          <li className="text-green-600 italic">No details filled yet</li>
+                        )}
+                      </ul>
+                    </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {BOARDING_BOOLEAN_CHECKS.map(({ key, label }) => (
-                  <label
-                    key={key}
-                    className="flex items-center gap-2 rounded-2xl border border-gray-200 p-3 text-sm font-semibold text-foreground"
-                  >
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={detailForm[key] as boolean}
-                      onChange={(event) => updateDetailField(key, event.target.checked as BoardingDetail[typeof key])}
+                    {/* Remaining Fields */}
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <AlertCircle className="h-5 w-5 text-amber-600" />
+                        <h4 className="font-semibold text-amber-900">Remaining Fields</h4>
+                      </div>
+                      <ul className="space-y-1 text-sm text-amber-800">
+                        {!detailForm.checkInDate && <li>Check-in date required</li>}
+                        {!detailForm.checkOutDate && <li>Check-out date required</li>}
+                        {!detailForm.cageNumber && <li>Cage assignment pending</li>}
+                        {!detailForm.emergencyContact && <li>Emergency contact missing</li>}
+                        {!detailForm.vaccinationComplete && <li>Verify vaccination status</li>}
+                        {detailForm.checkInDate && detailForm.checkOutDate && detailForm.cageNumber && detailForm.emergencyContact && (
+                          <li className="text-amber-600 italic">All required fields complete!</li>
+                        )}
+                      </ul>
+                    </div>
+
+                    {/* Client Information */}
+                    <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <User className="h-5 w-5 text-blue-600" />
+                        <h4 className="font-semibold text-blue-900">Client Info</h4>
+                      </div>
+                      <div className="space-y-2 text-sm text-blue-800">
+                        <p><span className="font-medium">Pet:</span> {selectedAppointment.pet}</p>
+                        <p><span className="font-medium">Client:</span> {selectedAppointment.client}</p>
+                        <p><span className="font-medium">Scheduled:</span> {selectedAppointment.date || "TBD"} {selectedAppointment.time || ""}</p>
+                        <p><span className="font-medium">Veterinarian:</span> {selectedAppointment.doctor}</p>
+                        <p><span className="font-medium">Reason:</span> {selectedAppointment.reason || "Boarding"}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <Label>Check-in date</Label>
+                      <Input
+                        type="date"
+                        value={detailForm.checkInDate}
+                        onChange={(event) => updateDetailField("checkInDate", event.target.value)}
+                        className="rounded-2xl"
+                      />
+                    </div>
+                    <div>
+                      <Label>Check-in time</Label>
+                      <Input
+                        type="time"
+                        value={detailForm.checkInTime}
+                        onChange={(event) => updateDetailField("checkInTime", event.target.value)}
+                        className="rounded-2xl"
+                      />
+                    </div>
+                    <div>
+                      <Label>Check-out date</Label>
+                      <Input
+                        type="date"
+                        value={detailForm.checkOutDate}
+                        onChange={(event) => updateDetailField("checkOutDate", event.target.value)}
+                        className="rounded-2xl"
+                      />
+                    </div>
+                    <div>
+                      <Label>Check-out time</Label>
+                      <Input
+                        type="time"
+                        value={detailForm.checkOutTime}
+                        onChange={(event) => updateDetailField("checkOutTime", event.target.value)}
+                        className="rounded-2xl"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Cage Selection */}
+                  {detailForm.checkInDate && detailForm.checkOutDate && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <Box className="h-4 w-4" />
+                        Assign Cage
+                      </Label>
+                      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                        <CageSelectorCompact
+                          startDate={detailForm.checkInDate}
+                          endDate={detailForm.checkOutDate}
+                          selectedCage={detailForm.cageNumber}
+                          onSelect={(cageNumber) => updateDetailField("cageNumber", cageNumber || null)}
+                        />
+                        {detailForm.cageNumber && (
+                          <p className="mt-2 text-sm text-green-700">
+                            Cage C{detailForm.cageNumber} selected for {detailForm.checkInDate} to {detailForm.checkOutDate}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {BOARDING_BOOLEAN_CHECKS.map(({ key, label }) => (
+                      <label
+                        key={key}
+                        className="flex items-center gap-2 rounded-2xl border border-gray-200 p-3 text-sm font-semibold text-foreground"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={detailForm[key] as boolean}
+                          onChange={(event) => updateDetailField(key, event.target.checked as BoardingDetail[typeof key])}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+
+                  {detailForm.hasAllergy && (
+                    <div>
+                      <Label>Allergy notes</Label>
+                      <textarea
+                        className="w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.allergyNotes}
+                        onChange={(event) => updateDetailField("allergyNotes", event.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <Label>Items staying with pet</Label>
+                    <textarea
+                      className="w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                      rows={3}
+                      placeholder="Carrier, favorite blanket, medication, etc."
+                      value={detailForm.stayItems}
+                      onChange={(event) => updateDetailField("stayItems", event.target.value)}
                     />
-                    {label}
-                  </label>
-                ))}
-              </div>
+                  </div>
 
-              {detailForm.hasAllergy && (
-                <div>
-                  <Label>Allergy notes</Label>
-                  <textarea
-                    className="w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.allergyNotes}
-                    onChange={(event) => updateDetailField("allergyNotes", event.target.value)}
-                  />
-                </div>
+                  <div>
+                    <Label>Health issues / instructions</Label>
+                    <textarea
+                      className="w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                      rows={3}
+                      placeholder="Diet restrictions, medications, behavioral notes"
+                      value={detailForm.healthConcerns}
+                      onChange={(event) => updateDetailField("healthConcerns", event.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Feeding instructions</Label>
+                    <textarea
+                      className="w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                      rows={3}
+                      placeholder="Feeding schedule, special diet requirements"
+                      value={detailForm.feedingInstructions}
+                      onChange={(event) => updateDetailField("feedingInstructions", event.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Emergency contact</Label>
+                    <Input
+                      type="text"
+                      placeholder="Emergency contact number"
+                      value={detailForm.emergencyContact}
+                      onChange={(event) => updateDetailField("emergencyContact", event.target.value)}
+                      className="rounded-2xl"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={closeStayDetail} className="rounded-2xl">
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveDetail} disabled={detailSaving} className="rounded-2xl bg-[#4338ca] text-white">
+                      {detailSaving ? "Saving…" : "Save details"}
+                    </Button>
+                  </div>
+                </>
               )}
-
-              <div>
-                <Label>Items staying with pet</Label>
-                <textarea
-                  className="w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                  rows={3}
-                  placeholder="Carrier, favorite blanket, medication, etc."
-                  value={detailForm.stayItems}
-                  onChange={(event) => updateDetailField("stayItems", event.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label>Health issues / instructions</Label>
-                <textarea
-                  className="w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                  rows={4}
-                  placeholder="Diet restrictions, medications, behavioral notes"
-                  value={detailForm.healthConcerns}
-                  onChange={(event) => updateDetailField("healthConcerns", event.target.value)}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={closeStayDetail} className="rounded-2xl">
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveDetail} disabled={detailSaving} className="rounded-2xl bg-[#4338ca] text-white">
-                  {detailSaving ? "Saving…" : "Save details"}
-                </Button>
-              </div>
             </CardContent>
           </Card>
         </div>

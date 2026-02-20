@@ -59,7 +59,7 @@ const EXPENSE_CATEGORIES = [
 ]
 
 const EXPENSE_TYPES: Record<string, string[]> = {
-  Salary: ["Doctor Salary", "Staff Salary", "Bonus", "Incentive"],
+  Salary: ["Veterinarian Salary", "Staff Salary", "Bonus", "Incentive"],
   Utilities: ["Electricity", "Water", "Gas", "Internet", "Telephone"],
   Rent: ["Clinic Rent", "Building Lease", "Equipment Lease", "Storage Rent"],
   Supplies: ["Medical Supplies", "Office Supplies", "Pet Food", "Cleaning Supplies"],

@@ -50,12 +50,14 @@ app.use('/api/supplier-dues', require('./routes/supplierDues'));
 app.use('/api/supplier-due-payments', require('./routes/supplierDuePayments'));
 app.use('/api/supplier-dues-sync', require('./routes/supplierDueSync'));
 app.use('/api/products', require('./routes/products'));
+app.use('/api/product-labels', require('./routes/productLabels'));
 app.use('/api/purchases', require('./routes/purchases'));
 app.use('/api/purchase-items', require('./routes/purchaseItems'));
 app.use('/api/purchase-returns', require('./routes/purchaseReturns'));
 app.use('/api/purchase-return-items', require('./routes/purchaseReturnItems'));
 app.use('/api/sales', require('./routes/sales'));
 app.use('/api/sale-items', require('./routes/saleItems'));
+app.use('/api/sales-items', require('./routes/salesItems'));
 app.use('/api/sales-returns', require('./routes/salesReturns'));
 app.use('/api/sales-return-items', require('./routes/salesReturnItems'));
 app.use('/api/expenses', require('./routes/expenses'));
@@ -72,6 +74,10 @@ app.use('/api/financials', require('./routes/financials'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/vat', require('./routes/vat'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/services-extension', require('./routes/servicesExtension'));
+app.use('/api/service-types', require('./routes/serviceTypes'));
+app.use('/api/recycle-bin', require('./routes/recycleBin'));
+app.use('/api/cages', require('./routes/cages'));
 
 app.use((err, _req, res, _next) => {
   console.error('Error:', err);

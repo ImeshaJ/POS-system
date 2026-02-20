@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import PageTitle from "@/components/common/PageTitle"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -37,6 +38,7 @@ const formatCurrency = (value: number) =>
 
 export default function NewPurchase() {
   const toast = useToast()
+  const navigate = useNavigate()
 
   /* ---------- STATE ---------- */
 
@@ -185,7 +187,7 @@ export default function NewPurchase() {
         return
       }
 
-      await apiPost("/api/purchases/full", {
+      const response = await apiPost<{ id: number }>("/api/purchases/full", {
         supplier_id: resolvedSupplierId,
         invoice_no: `PUR-${Date.now().toString().slice(-6)}`,
         date: today,
@@ -197,12 +199,14 @@ export default function NewPurchase() {
         })),
       })
 
-      const refreshed = await fetchCatalogData()
-      setProducts(refreshed.products)
-      setSuppliers(refreshed.suppliers)
-
       toast.success("Purchase saved successfully")
-      resetForm()
+
+      // Navigate to purchase detail page
+      if (response.data?.id) {
+        navigate(`/purchases/${response.data.id}`)
+      } else {
+        resetForm()
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save purchase")
     } finally {

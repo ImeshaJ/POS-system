@@ -291,7 +291,7 @@ export default function ExpenseReport() {
               variant="outline"
               onClick={fetchSummary}
               disabled={loading}
-              className="rounded-2xl border-white/60 text-white"
+              className="rounded-2xl border-white/80 bg-white/20 text-white hover:bg-white/30"
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh data
             </Button>
@@ -388,12 +388,12 @@ export default function ExpenseReport() {
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div>
             <p className="text-sm text-muted-foreground">Total spend</p>
-            <p className="text-3xl font-bold text-white">{formatCurrency(totalExpenses)}</p>
+            <p className="text-3xl font-bold text-foreground">{formatCurrency(totalExpenses)}</p>
             <p className="text-xs text-muted-foreground">All categories combined.</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Average entry</p>
-            <p className="text-3xl font-bold text-white">{formatCurrency(averageExpense)}</p>
+            <p className="text-3xl font-bold text-foreground">{formatCurrency(averageExpense)}</p>
             <p className="text-xs text-muted-foreground">{formatNumber(summary.entryCount || 0)} entries logged.</p>
           </div>
         </CardContent>
@@ -439,15 +439,15 @@ export default function ExpenseReport() {
               <div key={status.status} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold capitalize text-white">{status.status}</p>
+                    <p className="text-sm font-semibold capitalize text-foreground">{status.status}</p>
                     <p className="text-xs text-muted-foreground">{formatNumber(status.entries)} entries</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-white">{formatCurrency(status.amount)}</p>
+                    <p className="font-semibold text-foreground">{formatCurrency(status.amount)}</p>
                     <p className="text-xs text-muted-foreground">{status.share.toFixed(1)}% of recent spend</p>
                   </div>
                 </div>
-                <div className="h-2 w-full rounded-full bg-white/10">
+                <div className="h-2 w-full rounded-full bg-muted">
                   <div
                     className={`h-2 rounded-full bg-linear-to-r ${statusGradientClass(status.status)}`}
                     style={{ width: `${Math.min(100, Math.max(0, status.share))}%` }}

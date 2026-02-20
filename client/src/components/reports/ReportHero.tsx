@@ -23,7 +23,7 @@ interface ReportHeroProps {
   gradient?: string
 }
 
-const DEFAULT_HEADER_GRADIENT = "from-[#0f172a] via-[#1d4ed8] to-[#7c3aed]"
+const DEFAULT_HEADER_GRADIENT = "from-[#002366] via-[#1a4d99] to-[#6a11cb]"
 
 export function ReportHero({
   kicker = "Console",
@@ -41,13 +41,13 @@ export function ReportHero({
         <div className={cn("bg-linear-to-r p-6 text-white", gradient)}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-white/70">{kicker}</p>
-              <h2 className="text-3xl font-bold">{title}</h2>
-              <p className="text-sm text-white/80">{subtitle}</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-white/80">{kicker}</p>
+              <h2 className="text-3xl font-bold text-white">{title}</h2>
+              <p className="text-sm text-white/90">{subtitle}</p>
             </div>
             <div className="flex flex-col items-end gap-3 text-right">
               {badgeLabel && (
-                <Badge className="brand-pill border border-white/30 bg-white/10 text-white">{badgeLabel}</Badge>
+                <Badge className="brand-pill border border-white/40 bg-white/20 text-white font-medium">{badgeLabel}</Badge>
               )}
               {actions}
             </div>

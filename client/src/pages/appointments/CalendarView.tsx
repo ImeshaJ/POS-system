@@ -711,10 +711,10 @@ export default function AppointmentCalendar() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="appointment-doctor" className="text-sm font-medium">Doctor</Label>
+                  <Label htmlFor="appointment-doctor" className="text-sm font-medium">Veterinarian</Label>
                   <Input
                     id="appointment-doctor"
-                    placeholder="Doctor name"
+                    placeholder="Veterinarian name"
                     className="h-9"
                     value={form.doctor}
                     onChange={(e) => setForm({ ...form, doctor: e.target.value })}

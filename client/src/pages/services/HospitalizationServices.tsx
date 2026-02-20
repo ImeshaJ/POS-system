@@ -27,7 +27,7 @@ import {
   Trash2,
   X,
 } from "lucide-react"
-import { apiDelete, apiGet } from "@/lib/api"
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api"
 import { useToast } from "@/components/common/Toast"
 import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
@@ -46,6 +46,27 @@ interface AddonCare {
   name: string
   price: string
   description: string
+}
+
+interface ApiServicePackage {
+  id: number
+  name: string
+  price: string
+  description: string | null
+  duration_days: number
+  duration_hours: number
+  duration_minutes: number
+  status: string
+  service_type_code: string
+}
+
+interface ApiAddOnService {
+  id: number
+  name: string
+  price: string
+  description: string | null
+  status: string
+  service_type_code: string
 }
 
 type AppointmentStatus = "Scheduled" | "Completed" | "Cancelled" | "No-Show"
@@ -84,6 +105,25 @@ type RoundsDetail = {
   isolationRequired: boolean
   painScaleCaptured: boolean
   ownerUpdatesSent: boolean
+}
+
+type ApiHospitalizationCase = {
+  id: number
+  appointment_id: number
+  admission_date: string | null
+  admission_time: string | null
+  discharge_date: string | null
+  discharge_time: string | null
+  diagnosis: string | null
+  treatment_plan: string | null
+  medications: string | null
+  vitals_on_admission: string | null
+  cage_number: string | null
+  isolation_required: boolean
+  iv_fluids_required: boolean
+  oxygen_support: boolean
+  special_diet: string | null
+  daily_notes: string | null
 }
 
 type RoundsChecklistKey = keyof Pick<
@@ -222,8 +262,9 @@ export default function HospitalizationServices() {
   const [selectedCase, setSelectedCase] = useState<InpatientCase | null>(null)
   const [detailForm, setDetailForm] = useState<RoundsDetail>(createDefaultDetail())
   const [detailSaving, setDetailSaving] = useState(false)
-  const [caseDetails, setCaseDetails] = useState<Record<string, RoundsDetail>>({})
   const [roundsHistory, setRoundsHistory] = useState<RoundsHistoryEntry[]>([])
+  const [hospitalizationCaseId, setHospitalizationCaseId] = useState<number | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   const hospitalKeywords = useMemo(() => HOSPITAL_KEYWORDS.map((keyword) => keyword.toLowerCase()), [])
 
@@ -245,9 +286,46 @@ export default function HospitalizationServices() {
     }
   }, [hospitalKeywords])
 
+  const fetchPackages = useCallback(async () => {
+    try {
+      const res = await apiGet<ApiServicePackage[]>("/api/service-types/packages/by-type/hospitalization")
+      if (res.data.length > 0) {
+        setPackages(res.data.map(pkg => ({
+          id: pkg.id,
+          name: pkg.name,
+          price: `Rs. ${parseFloat(pkg.price).toLocaleString()}`,
+          description: pkg.description || "",
+          lengthOfStay: pkg.duration_days ? `${pkg.duration_days} days` : "Per day",
+          wardLevel: "Standard ward",
+          active: pkg.status === "active"
+        })))
+      }
+    } catch {
+      // Use default packages if API fails
+    }
+  }, [])
+
+  const fetchAddonServices = useCallback(async () => {
+    try {
+      const res = await apiGet<ApiAddOnService[]>("/api/service-types/addons/by-type/hospitalization")
+      if (res.data.length > 0) {
+        setAddonServices(res.data.map(addon => ({
+          id: addon.id,
+          name: addon.name,
+          price: `Rs. ${parseFloat(addon.price).toLocaleString()}`,
+          description: addon.description || ""
+        })))
+      }
+    } catch {
+      // Use default services if API fails
+    }
+  }, [])
+
   useEffect(() => {
     fetchCases()
-  }, [fetchCases])
+    fetchPackages()
+    fetchAddonServices()
+  }, [fetchCases, fetchPackages, fetchAddonServices])
 
   const totalAdmissions = cases.length
 
@@ -434,14 +512,38 @@ export default function HospitalizationServices() {
     setDeleteServiceId(null)
   }
 
-  const openCaseDetail = (inpatientCase: InpatientCase) => {
+  const openCaseDetail = async (inpatientCase: InpatientCase) => {
     setSelectedCase(inpatientCase)
-    setDetailForm(caseDetails[inpatientCase.id] ?? createDefaultDetail())
+    setDetailLoading(true)
+    setHospitalizationCaseId(null)
+    setDetailForm(createDefaultDetail())
+    try {
+      const res = await apiGet<ApiHospitalizationCase>(`/api/services-extension/hospitalization-cases/by-appointment/${inpatientCase.id}`)
+      const data = res.data
+      setHospitalizationCaseId(data.id)
+      setDetailForm({
+        admissionSummary: data.diagnosis || "",
+        vitalsScore: data.vitals_on_admission || "",
+        medications: data.medications || "",
+        catheterNotes: data.daily_notes || "",
+        dietPlan: data.special_diet || "",
+        dischargePlan: data.treatment_plan || "",
+        consentSigned: false,
+        isolationRequired: data.isolation_required || false,
+        painScaleCaptured: false,
+        ownerUpdatesSent: false,
+      })
+    } catch {
+      // No existing record - use defaults
+    } finally {
+      setDetailLoading(false)
+    }
   }
 
   const closeCaseDetail = () => {
     setSelectedCase(null)
     setDetailForm(createDefaultDetail())
+    setHospitalizationCaseId(null)
     setDetailSaving(false)
   }
 
@@ -449,29 +551,49 @@ export default function HospitalizationServices() {
     setDetailForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleSaveDetail = () => {
+  const handleSaveDetail = async () => {
     if (!selectedCase) return
     setDetailSaving(true)
-    setCaseDetails((prev) => ({ ...prev, [selectedCase.id]: detailForm }))
-    setRoundsHistory((prev) => {
-      const entry: RoundsHistoryEntry = {
-        caseId: selectedCase.id,
-        inpatientCase: selectedCase,
-        detail: detailForm,
-        updatedAt: Date.now(),
+    try {
+      const payload = {
+        appointment_id: Number(selectedCase.id),
+        diagnosis: detailForm.admissionSummary,
+        treatment_plan: detailForm.dischargePlan,
+        medications: detailForm.medications,
+        vitals_on_admission: detailForm.vitalsScore,
+        isolation_required: detailForm.isolationRequired,
+        special_diet: detailForm.dietPlan,
+        daily_notes: detailForm.catheterNotes,
       }
-      const index = prev.findIndex((item) => item.caseId === selectedCase.id)
-      if (index === -1) {
-        return [entry, ...prev]
+      if (hospitalizationCaseId) {
+        await apiPut(`/api/services-extension/hospitalization-cases/${hospitalizationCaseId}`, payload)
+        toast.success("Hospitalization details updated successfully")
+      } else {
+        const res = await apiPost<ApiHospitalizationCase>("/api/services-extension/hospitalization-cases", payload)
+        setHospitalizationCaseId(res.data.id)
+        toast.success("Hospitalization details saved successfully")
       }
-      const clone = [...prev]
-      clone[index] = entry
-      return clone
-    })
-    setTimeout(() => {
-      setDetailSaving(false)
+      setRoundsHistory((prev) => {
+        const entry: RoundsHistoryEntry = {
+          caseId: selectedCase.id,
+          inpatientCase: selectedCase,
+          detail: detailForm,
+          updatedAt: Date.now(),
+        }
+        const index = prev.findIndex((item) => item.caseId === selectedCase.id)
+        if (index === -1) {
+          return [entry, ...prev]
+        }
+        const clone = [...prev]
+        clone[index] = entry
+        return clone
+      })
       closeCaseDetail()
-    }, 250)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save hospitalization details")
+    } finally {
+      setDetailSaving(false)
+    }
   }
 
   const handleDeleteCaseClick = (caseId: string) => {
@@ -484,12 +606,6 @@ export default function HospitalizationServices() {
     try {
       await apiDelete(`/api/appointments/${deleteCaseId}`)
       setCases((prev) => prev.filter((record) => record.id !== deleteCaseId))
-      setCaseDetails((prev) => {
-        if (!prev[deleteCaseId]) return prev
-        const copy = { ...prev }
-        delete copy[deleteCaseId]
-        return copy
-      })
       setRoundsHistory((prev) => prev.filter((entry) => entry.caseId !== deleteCaseId))
       toast.success("Hospitalization deleted successfully")
     } catch (error) {
@@ -502,7 +618,7 @@ export default function HospitalizationServices() {
 
   const handleExportLedger = () => {
     if (!filteredCases.length) return
-    const headers = ["Pet", "Client", "Date", "Time", "Reason", "Doctor", "Status"]
+    const headers = ["Pet", "Client", "Date", "Time", "Reason", "Veterinarian", "Status"]
     const rows = filteredCases.map((record) => [
       record.pet,
       record.client,
@@ -830,7 +946,7 @@ export default function HospitalizationServices() {
                     <TableHead>Schedule</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Doctor</TableHead>
+                    <TableHead>Veterinarian</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -984,85 +1100,93 @@ export default function HospitalizationServices() {
               </button>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <Label>Admission summary</Label>
-                  <textarea
-                    className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.admissionSummary}
-                    onChange={(event) => updateDetailField("admissionSummary", event.target.value)}
-                  />
+              {detailLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader />
                 </div>
-                <div>
-                  <Label>Vitals score / notes</Label>
-                  <textarea
-                    className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.vitalsScore}
-                    onChange={(event) => updateDetailField("vitalsScore", event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Medications</Label>
-                  <textarea
-                    className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.medications}
-                    onChange={(event) => updateDetailField("medications", event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Catheter / lines</Label>
-                  <textarea
-                    className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.catheterNotes}
-                    onChange={(event) => updateDetailField("catheterNotes", event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Diet plan</Label>
-                  <textarea
-                    className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.dietPlan}
-                    onChange={(event) => updateDetailField("dietPlan", event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Discharge plan</Label>
-                  <textarea
-                    className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.dischargePlan}
-                    onChange={(event) => updateDetailField("dischargePlan", event.target.value)}
-                  />
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <Label>Admission summary</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.admissionSummary}
+                        onChange={(event) => updateDetailField("admissionSummary", event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Vitals score / notes</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.vitalsScore}
+                        onChange={(event) => updateDetailField("vitalsScore", event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Medications</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.medications}
+                        onChange={(event) => updateDetailField("medications", event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Catheter / lines</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.catheterNotes}
+                        onChange={(event) => updateDetailField("catheterNotes", event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Diet plan</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.dietPlan}
+                        onChange={(event) => updateDetailField("dietPlan", event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Discharge plan</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.dischargePlan}
+                        onChange={(event) => updateDetailField("dischargePlan", event.target.value)}
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {ROUNDS_CHECKS.map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-2 rounded-2xl border border-gray-200 p-3 text-sm font-semibold text-foreground">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={detailForm[key] as boolean}
-                      onChange={(event) => updateDetailField(key, event.target.checked as RoundsDetail[typeof key])}
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {ROUNDS_CHECKS.map(({ key, label }) => (
+                      <label key={key} className="flex items-center gap-2 rounded-2xl border border-gray-200 p-3 text-sm font-semibold text-foreground">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={detailForm[key] as boolean}
+                          onChange={(event) => updateDetailField(key, event.target.checked as RoundsDetail[typeof key])}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
 
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={closeCaseDetail} className="rounded-2xl">
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveDetail} disabled={detailSaving} className="rounded-2xl bg-[#4338ca] text-white">
-                  {detailSaving ? "Saving…" : "Save details"}
-                </Button>
-              </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={closeCaseDetail} className="rounded-2xl">
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveDetail} disabled={detailSaving} className="rounded-2xl bg-[#4338ca] text-white">
+                      {detailSaving ? "Saving…" : "Save details"}
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

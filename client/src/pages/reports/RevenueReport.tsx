@@ -575,7 +575,7 @@ export default function RevenueReport() {
               variant="outline"
               onClick={fetchAppointments}
               disabled={appointmentLoading}
-              className="rounded-2xl border-white/60 text-white"
+              className="rounded-2xl border-white/80 bg-white/20 text-white hover:bg-white/30"
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${appointmentLoading ? "animate-spin" : ""}`} /> Refresh data
             </Button>
@@ -681,8 +681,8 @@ export default function RevenueReport() {
               <tbody>
                 {categoryBreakdown.map((category) => (
                   <tr key={category.category} className="border-b last:border-0">
-                    <td className="py-2 px-3 font-medium text-white">{category.category}</td>
-                    <td className="py-2 px-3 text-right text-emerald-300">{formatCurrency(category.amount)}</td>
+                    <td className="py-2 px-3 font-medium text-foreground">{category.category}</td>
+                    <td className="py-2 px-3 text-right text-emerald-600">{formatCurrency(category.amount)}</td>
                     <td className="py-2 px-3 text-center text-muted-foreground">{formatNumber(category.count)}</td>
                     <td className="py-2 px-3 text-right text-muted-foreground">{category.share.toFixed(1)}%</td>
                   </tr>
@@ -708,10 +708,10 @@ export default function RevenueReport() {
             {sourceMix.map((mix) => (
               <div key={mix.label} className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-white">{mix.label}</p>
-                  <p className="text-base font-semibold text-white">{formatCurrency(mix.amount)}</p>
+                  <p className="text-sm font-semibold text-foreground">{mix.label}</p>
+                  <p className="text-base font-semibold text-foreground">{formatCurrency(mix.amount)}</p>
                 </div>
-                <div className="h-2 w-full rounded-full bg-white/10">
+                <div className="h-2 w-full rounded-full bg-muted">
                   <div
                     className={`h-2 rounded-full bg-linear-to-r ${mix.tone}`}
                     style={{ width: `${Math.min(100, Math.max(0, mix.share))}%` }}
@@ -731,13 +731,13 @@ export default function RevenueReport() {
         </CardHeader>
         <CardContent className="space-y-3">
           {topSources.map((row) => (
-            <div key={row.id} className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3">
+            <div key={row.id} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
               <div>
-                <p className="font-semibold text-white">{row.source}</p>
+                <p className="font-semibold text-foreground">{row.source}</p>
                 <p className="text-xs text-muted-foreground">{row.category}</p>
               </div>
               <div className="text-right">
-                <p className="text-base font-bold text-emerald-300">{formatCurrency(row.amount)}</p>
+                <p className="text-base font-bold text-emerald-600">{formatCurrency(row.amount)}</p>
                 <p className="text-xs text-muted-foreground">{row.share.toFixed(1)}% share</p>
               </div>
             </div>
@@ -782,10 +782,10 @@ export default function RevenueReport() {
             <tbody>
               {visibleRevenue.map((row) => (
                 <tr key={row.id} className="border-b last:border-0">
-                  <td className="py-2 px-3 font-semibold text-white">{row.source}</td>
+                  <td className="py-2 px-3 font-semibold text-foreground">{row.source}</td>
                   <td className="py-2 px-3 text-sm text-muted-foreground">{row.category}</td>
                   <td className="py-2 px-3 text-center text-muted-foreground">{formatNumber(row.count)}</td>
-                  <td className="py-2 px-3 text-right font-semibold text-white">{formatCurrency(row.amount)}</td>
+                  <td className="py-2 px-3 text-right font-semibold text-foreground">{formatCurrency(row.amount)}</td>
                   <td className="py-2 px-3 text-right text-muted-foreground">{row.share.toFixed(1)}%</td>
                   <td className="py-2 px-3 text-center">
                     <Badge variant="outline" className={`${originBadgeClass(row.origin)} border`}>

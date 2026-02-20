@@ -308,6 +308,13 @@ router.get("/:id/full", verifyToken, async (req, res, next) => {
   }
 });
 
+/**
+ * POST /api/sales/full
+ * Complete sale with items - handles both products and services
+ * - Products: Reduces stock quantity
+ * - Services/Packages/Add-ons: No stock reduction
+ * - Updates client due amount if payment not fully received
+ */
 router.post("/full", verifyToken, async (req, res, next) => {
   const {
     client_id,
@@ -322,6 +329,11 @@ router.post("/full", verifyToken, async (req, res, next) => {
     total,
     payment_type = "Cash",
     status = "Completed",
+    received_amount = 0,
+    // Card payment fields
+    card_last_four,
+    card_type,
+    card_approval_code,
     items,
   } = req.body || {};
 
@@ -332,12 +344,19 @@ router.post("/full", verifyToken, async (req, res, next) => {
   const normalizedItems = [];
   for (let i = 0; i < items.length; i += 1) {
     const raw = items[i] || {};
-    const product_id = Number(raw.product_id ?? raw.productId);
-    const qty = Number(raw.qty ?? 0);
+    const item_type = String(raw.item_type || raw.type || "product").toLowerCase();
+    const item_id = Number(raw.product_id ?? raw.productId ?? raw.item_id ?? raw.id ?? 0);
+    const item_code = String(raw.item_code || raw.code || "");
+    const item_name = String(raw.name || "");
+    const qty = Number(raw.qty ?? 1);
     const price = Number(raw.price ?? 0);
 
-    if (!product_id) {
-      return res.status(400).json({ success: false, message: `Item ${i + 1}: product_id is required` });
+    // For products, we need an ID. For services, name is sufficient
+    if (item_type === "product" && !item_id) {
+      return res.status(400).json({ success: false, message: `Item ${i + 1}: product_id is required for products` });
+    }
+    if (!item_name && !item_id) {
+      return res.status(400).json({ success: false, message: `Item ${i + 1}: name or id is required` });
     }
     if (!Number.isFinite(qty) || qty <= 0) {
       return res.status(400).json({ success: false, message: `Item ${i + 1}: qty must be greater than 0` });
@@ -346,51 +365,104 @@ router.post("/full", verifyToken, async (req, res, next) => {
       return res.status(400).json({ success: false, message: `Item ${i + 1}: price must be 0 or greater` });
     }
 
-    normalizedItems.push({ product_id, qty, price });
+    normalizedItems.push({
+      item_type,
+      item_id: item_id || null,
+      item_code,
+      item_name,
+      qty,
+      price,
+    });
   }
 
   const saleDate = date || new Date().toISOString().slice(0, 10);
   const saleTime = time || new Date().toTimeString().slice(0, 8);
+  const receivedAmount = Number(received_amount) || 0;
+  const totalAmount = Number(total) || 0;
+  const amountDue = totalAmount - receivedAmount;
+
+  // Determine final status based on payment
+  let finalStatus = status;
+  if (status === "Completed" && amountDue > 0) {
+    finalStatus = "Partial"; // Partial payment
+  }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
+    // Insert sale record (including card payment fields if provided)
     const saleResult = await client.query(
-      `INSERT INTO sales (invoice_no, client_id, customer, pet_name, date, time, subtotal, vat, discount, total, payment_type, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO sales (invoice_no, client_id, customer, pet_name, date, time, subtotal, vat, discount, total, payment_type, status, card_last_four, card_type, card_approval_code)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
-      [invoice_no || null, client_id || null, customer || null, pet_name || null, saleDate, saleTime, subtotal || 0, vat || 0, discount || 0, total, payment_type, status]
+      [invoice_no || null, client_id || null, customer || null, pet_name || null, saleDate, saleTime, subtotal || 0, vat || 0, discount || 0, totalAmount, payment_type, finalStatus, card_last_four || null, card_type || null, card_approval_code || null]
     );
 
     const sale = saleResult.rows[0];
     const insertedItems = [];
+    const stockUpdates = [];
 
     for (const item of normalizedItems) {
+      // Get item name - for products, fetch from products table
+      let finalName = item.item_name;
+      if (item.item_type === "product" && item.item_id && !finalName) {
+        const productResult = await client.query(
+          "SELECT name FROM products WHERE id = $1",
+          [item.item_id]
+        );
+        if (productResult.rows.length > 0) {
+          finalName = productResult.rows[0].name;
+        }
+      }
+
+      // Insert sale item with type
       const itemResult = await client.query(
-        `INSERT INTO sale_items (sale_id, name, price, qty, product_id)
-         VALUES ($1, (SELECT name FROM products WHERE id = $5), $2, $3, $5)
+        `INSERT INTO sale_items (sale_id, product_id, name, price, qty, item_type, item_code)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [sale.id, item.price, item.qty, item.product_id, item.product_id]
+        [
+          sale.id,
+          item.item_type === "product" ? item.item_id : null,
+          finalName || "Unnamed Item",
+          item.price,
+          item.qty,
+          item.item_type,
+          item.item_code || null,
+        ]
       );
       insertedItems.push(itemResult.rows[0]);
 
-      await client.query(
-        `UPDATE products
-         SET quantity = GREATEST(COALESCE(quantity, 0) - $2, 0),
-             updated_at = NOW()
-         WHERE id = $1`,
-        [item.product_id, item.qty]
-      );
+      // Only reduce stock for PRODUCTS, not services/packages/addons
+      if (item.item_type === "product" && item.item_id) {
+        const updateResult = await client.query(
+          `UPDATE products
+           SET quantity = GREATEST(COALESCE(quantity, 0) - $2, 0),
+               updated_at = NOW()
+           WHERE id = $1
+           RETURNING id, name, quantity`,
+          [item.item_id, item.qty]
+        );
+
+        if (updateResult.rows.length > 0) {
+          stockUpdates.push({
+            product_id: item.item_id,
+            product_name: updateResult.rows[0].name,
+            new_quantity: updateResult.rows[0].quantity,
+            reduced_by: item.qty,
+          });
+        }
+      }
     }
 
-    if (client_id && total > 0) {
+    // Update client due amount if there's an outstanding balance
+    if (client_id && amountDue > 0) {
       await client.query(
         `UPDATE clients
          SET due_amount = COALESCE(due_amount, 0) + $2,
              updated_at = NOW()
          WHERE id = $1`,
-        [client_id, total]
+        [client_id, amountDue]
       );
     }
 
@@ -401,7 +473,15 @@ router.post("/full", verifyToken, async (req, res, next) => {
       data: {
         ...sale,
         items: insertedItems,
+        stock_updates: stockUpdates,
+        payment_summary: {
+          total: totalAmount,
+          received: receivedAmount,
+          due: amountDue,
+          status: finalStatus,
+        },
       },
+      message: `Sale completed successfully. ${stockUpdates.length} product(s) stock updated.`,
     });
   } catch (err) {
     await client.query("ROLLBACK");

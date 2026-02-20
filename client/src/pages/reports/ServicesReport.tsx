@@ -525,7 +525,7 @@ export default function ServicesReport() {
             <Button onClick={downloadReport} disabled={!visibleServices.length} className="rounded-2xl bg-white/90 px-5 py-2 text-[#0f172a] hover:bg-white">
               <Download className="mr-2 h-4 w-4" /> Export CSV
             </Button>
-            <Button variant="outline" onClick={fetchAppointments} disabled={appointmentLoading} className="rounded-2xl border-white/60 text-white">
+            <Button variant="outline" onClick={fetchAppointments} disabled={appointmentLoading} className="rounded-2xl border-white/80 bg-white/20 text-white hover:bg-white/30">
               <RefreshCw className={`mr-2 h-4 w-4 ${appointmentLoading ? "animate-spin" : ""}`} /> Sync appointments
             </Button>
           </div>
@@ -620,20 +620,20 @@ export default function ServicesReport() {
           <CardContent className="space-y-4">
             {visibleCategoryStats.length ? (
               visibleCategoryStats.map((stat) => (
-                <div key={stat.category} className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div key={stat.category} className="space-y-2 rounded-2xl border border-border bg-muted/20 p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold text-white">{stat.category}</p>
+                      <p className="font-semibold text-foreground">{stat.category}</p>
                       <p className="text-xs text-muted-foreground">{formatNumber(stat.bookings)} bookings</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-white">{formatCurrency(stat.revenue)}</p>
+                      <p className="text-lg font-bold text-foreground">{formatCurrency(stat.revenue)}</p>
                       <p className="text-xs text-muted-foreground">
                         Avg {formatCurrency(stat.revenue / (stat.bookings || 1))}
                       </p>
                     </div>
                   </div>
-                  <div className="h-2 w-full rounded-full bg-white/10">
+                  <div className="h-2 w-full rounded-full bg-muted">
                     <div
                       className="h-2 rounded-full bg-linear-to-r from-sky-400 to-sky-600"
                       style={{ width: `${visibleRevenue ? Math.min(100, (stat.revenue / visibleRevenue) * 100) : 0}%` }}
@@ -654,19 +654,19 @@ export default function ServicesReport() {
           </CardHeader>
           <CardContent className="space-y-4">
             {visibleOriginBreakdown.map((row) => (
-              <div key={row.label} className="space-y-2 rounded-2xl border border-white/10 p-4">
+              <div key={row.label} className="space-y-2 rounded-2xl border border-border p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-white">{row.label}</p>
+                    <p className="font-semibold text-foreground">{row.label}</p>
                     <p className="text-xs text-muted-foreground">{formatNumber(row.bookings)} bookings</p>
                   </div>
-                  <p className="text-lg font-bold text-white">{formatCurrency(row.revenue)}</p>
+                  <p className="text-lg font-bold text-foreground">{formatCurrency(row.revenue)}</p>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Revenue share</span>
                   <span>{row.share.toFixed(1)}%</span>
                 </div>
-                <div className="h-2 w-full rounded-full bg-white/10">
+                <div className="h-2 w-full rounded-full bg-muted">
                   <div
                     className="h-2 rounded-full bg-linear-to-r from-emerald-400 to-emerald-600"
                     style={{ width: `${Math.min(100, Math.max(0, row.share))}%` }}
@@ -687,14 +687,14 @@ export default function ServicesReport() {
           <CardContent className="space-y-3">
             {topVisibleServices.length ? (
               topVisibleServices.map((service, index) => (
-                <div key={service.id} className="space-y-1 rounded-2xl border border-white/10 p-4">
+                <div key={service.id} className="space-y-1 rounded-2xl border border-border p-4">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-sm font-semibold text-foreground">
                       {index + 1}. {service.name}
                     </p>
-                    <p className="text-emerald-300 font-bold">{formatCurrency(service.revenue)}</p>
+                    <p className="text-emerald-600 font-bold">{formatCurrency(service.revenue)}</p>
                   </div>
-                  <div className="w-full rounded-full bg-white/10 h-2">
+                  <div className="w-full rounded-full bg-muted h-2">
                     <div
                       className="h-2 rounded-full bg-linear-to-r from-emerald-400 to-emerald-600"
                       style={{
@@ -723,16 +723,16 @@ export default function ServicesReport() {
             <CardDescription>Appointment ingestion status and tariff overrides.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="rounded-2xl border border-border bg-muted/20 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Appointments</p>
-              <p className="text-2xl font-bold text-white">{formatNumber(appointments.length)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatNumber(appointments.length)}</p>
               <p className="text-xs text-muted-foreground">
                 {appointmentLoading ? "Sync in progress" : appointmentError ? appointmentError : "Records scanned from the calendar"}
               </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="rounded-2xl border border-border bg-muted/20 p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Tariff overrides</p>
-              <p className="text-2xl font-bold text-white">{formatNumber(Object.keys(tariffOverrides).length)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatNumber(Object.keys(tariffOverrides).length)}</p>
               <p className="text-xs text-muted-foreground">Local storage price overrides in effect.</p>
             </div>
           </CardContent>
@@ -769,13 +769,13 @@ export default function ServicesReport() {
             <tbody>
               {visibleServices.map((row) => (
                 <tr key={row.id} className="border-b last:border-0">
-                  <td className="py-2 px-3 font-semibold text-white">{row.name}</td>
+                  <td className="py-2 px-3 font-semibold text-foreground">{row.name}</td>
                   <td className="py-2 px-3 text-sm text-muted-foreground">{row.category}</td>
-                  <td className="py-2 px-3 text-right font-semibold text-white">{formatNumber(row.bookings)}</td>
+                  <td className="py-2 px-3 text-right font-semibold text-foreground">{formatNumber(row.bookings)}</td>
                   <td className="py-2 px-3 text-right text-muted-foreground">{formatCurrency(row.pricePerUnit)}</td>
-                  <td className="py-2 px-3 text-right font-bold text-emerald-300">{formatCurrency(row.revenue)}</td>
+                  <td className="py-2 px-3 text-right font-bold text-emerald-600">{formatCurrency(row.revenue)}</td>
                   <td className="py-2 px-3 text-center">
-                    <Badge variant="outline" className={`border ${row.origin === "manual" ? "bg-amber-50/20 text-amber-300" : "bg-emerald-50/20 text-emerald-300"}`}>
+                    <Badge variant="outline" className={`border ${row.origin === "manual" ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"}`}>
                       {row.origin === "manual" ? "Manual" : "Appointment"}
                     </Badge>
                   </td>

@@ -246,7 +246,7 @@ export default function ReturnHistory() {
               variant="outline"
               onClick={() => downloadCsv(visiblePurchases, "Purchase Returns")}
               disabled={!visiblePurchases.length}
-              className="rounded-2xl border-white/60 text-white"
+              className="rounded-2xl border-white/80 bg-white/20 text-white hover:bg-white/30"
             >
               <Download className="mr-2 h-4 w-4" /> Purchase CSV
             </Button>
@@ -341,14 +341,14 @@ export default function ReturnHistory() {
         <CardContent className="flex flex-wrap gap-4">
           {!reasons.length && !loading && <p className="text-sm text-muted-foreground">No reasons captured for this window.</p>}
           {reasons.slice(0, 6).map((reason) => (
-            <div key={reason.label} className="min-w-40 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 shadow-sm">
+            <div key={reason.label} className="min-w-40 rounded-2xl border border-border bg-muted/20 px-4 py-3 shadow-sm">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{formatNumber(reason.count)} cases</span>
                 <Badge variant="secondary" className="rounded-2xl border-dashed text-xs">
                   {formatCurrency(reason.amount)}
                 </Badge>
               </div>
-              <p className="mt-2 text-sm font-semibold text-white">{reason.label}</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">{reason.label}</p>
             </div>
           ))}
         </CardContent>
@@ -388,12 +388,12 @@ export default function ReturnHistory() {
                   )}
                   {visibleSales.map((row) => (
                     <tr key={row.id} className="border-b last:border-0">
-                      <td className="py-3 px-4 font-semibold text-white">{row.invoiceNo}</td>
+                      <td className="py-3 px-4 font-semibold text-sky-600">{row.invoiceNo}</td>
                       <td className="py-3 px-4 text-sm text-foreground">{row.customer}</td>
                       <td className="py-3 px-4 text-sm text-muted-foreground">{row.reason}</td>
                       <td className="py-3 px-4 text-sm text-muted-foreground">{formatDate(row.date)}</td>
                       <td className="py-3 px-4 text-center">{row.items}</td>
-                      <td className="py-3 px-4 text-right font-semibold text-rose-400">{formatCurrency(row.refund)}</td>
+                      <td className="py-3 px-4 text-right font-semibold text-rose-600">{formatCurrency(row.refund)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -447,12 +447,12 @@ export default function ReturnHistory() {
                   )}
                   {visiblePurchases.map((row) => (
                     <tr key={row.id} className="border-b last:border-0">
-                      <td className="py-3 px-4 font-semibold text-white">{row.invoiceNo}</td>
+                      <td className="py-3 px-4 font-semibold text-sky-600">{row.invoiceNo}</td>
                       <td className="py-3 px-4 text-sm text-foreground">{row.supplier}</td>
                       <td className="py-3 px-4 text-sm text-muted-foreground">{row.reason}</td>
                       <td className="py-3 px-4 text-sm text-muted-foreground">{formatDate(row.date)}</td>
                       <td className="py-3 px-4 text-center">{row.items}</td>
-                      <td className="py-3 px-4 text-right font-semibold text-emerald-300">{formatCurrency(row.refund)}</td>
+                      <td className="py-3 px-4 text-right font-semibold text-emerald-600">{formatCurrency(row.refund)}</td>
                     </tr>
                   ))}
                 </tbody>

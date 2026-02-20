@@ -293,7 +293,7 @@ export default function ProfitLossReport() {
             <Button onClick={downloadReport} className="rounded-2xl bg-white/90 px-5 py-2 text-[#0f172a] hover:bg-white">
               <Download className="mr-2 h-4 w-4" /> Export CSV
             </Button>
-            <Button variant="outline" onClick={fetchReport} disabled={loading} className="rounded-2xl border-white/60 text-white">
+            <Button variant="outline" onClick={fetchReport} disabled={loading} className="rounded-2xl border-white/80 bg-white/20 text-white hover:bg-white/30">
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh data
             </Button>
           </div>
@@ -409,9 +409,9 @@ export default function ProfitLossReport() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Average invoice</p>
-                <p className="text-2xl font-bold text-white">{formatCurrency(summary.averageInvoice)}</p>
+                <p className="text-2xl font-bold text-foreground">{formatCurrency(summary.averageInvoice)}</p>
               </div>
-              <Badge variant="outline" className="rounded-2xl border-white/40 text-white">
+              <Badge variant="outline" className="rounded-2xl border-border text-foreground">
                 {summary.invoiceCount} invoices
               </Badge>
             </div>
@@ -432,7 +432,7 @@ export default function ProfitLossReport() {
             <Button onClick={() => setChartType("bar")} variant={chartType === "bar" ? "default" : "outline"} size="sm" className="rounded-2xl">
               Bar chart
             </Button>
-            <Button onClick={downloadReport} variant="outline" size="sm" className="rounded-2xl border-white/40 text-white">
+            <Button onClick={downloadReport} variant="outline" size="sm" className="rounded-2xl">
               <Download className="mr-2 h-4 w-4" /> Export CSV
             </Button>
           </div>
@@ -478,15 +478,15 @@ export default function ProfitLossReport() {
           </CardHeader>
           <CardContent className="space-y-4">
             {expenseCategories.map((category) => (
-              <div key={category.category} className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div key={category.category} className="space-y-2 rounded-2xl border border-border bg-muted/20 p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-white">{category.category}</p>
+                    <p className="font-semibold text-foreground">{category.category}</p>
                     <p className="text-xs text-muted-foreground">{category.entries} entries</p>
                   </div>
-                  <p className="text-lg font-bold text-rose-300">{formatCurrency(category.amount)}</p>
+                  <p className="text-lg font-bold text-rose-600">{formatCurrency(category.amount)}</p>
                 </div>
-                <div className="h-2 w-full rounded-full bg-white/10">
+                <div className="h-2 w-full rounded-full bg-muted">
                   <div
                     className="h-2 rounded-full bg-linear-to-r from-rose-400 to-rose-600"
                     style={{ width: `${Math.min(100, (category.amount / totalExpenseMix) * 100)}%` }}
@@ -505,15 +505,15 @@ export default function ProfitLossReport() {
           </CardHeader>
           <CardContent className="space-y-3">
             {topExpenses.map((expense) => (
-              <div key={expense.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div key={expense.id} className="rounded-2xl border border-border bg-muted/20 p-4">
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold text-white">{expense.category}</p>
+                  <p className="font-semibold text-foreground">{expense.category}</p>
                   <span className="text-xs text-muted-foreground">{formatMonthLabel(expense.date)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground">{expense.type}</p>
                 <div className="mt-2 flex items-center justify-between">
                   <p className="text-sm text-muted-foreground line-clamp-1">{expense.note || "—"}</p>
-                  <span className="text-lg font-bold text-rose-300">{formatCurrency(expense.amount)}</span>
+                  <span className="text-lg font-bold text-rose-600">{formatCurrency(expense.amount)}</span>
                 </div>
               </div>
             ))}
@@ -557,20 +557,20 @@ export default function ProfitLossReport() {
               {filteredMonthly.map((row) => {
                 const margin = row.revenue ? (row.netProfit / row.revenue) * 100 : 0
                 return (
-                  <tr key={`${row.period}-${row.revenue}`} className="border-b border-white/10 last:border-0">
-                    <td className="py-3 px-4 font-semibold text-white">{formatMonthLabel(row.period)}</td>
-                    <td className="py-3 px-4 text-right font-semibold text-sky-200">{formatCurrency(row.revenue)}</td>
-                    <td className="py-3 px-4 text-right text-amber-200">{formatCurrency(row.costOfGoods)}</td>
-                    <td className="py-3 px-4 text-right text-rose-200">{formatCurrency(row.expenses)}</td>
-                    <td className={`py-3 px-4 text-right font-bold ${row.netProfit >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                  <tr key={`${row.period}-${row.revenue}`} className="border-b last:border-0">
+                    <td className="py-3 px-4 font-semibold text-foreground">{formatMonthLabel(row.period)}</td>
+                    <td className="py-3 px-4 text-right font-semibold text-sky-600">{formatCurrency(row.revenue)}</td>
+                    <td className="py-3 px-4 text-right text-amber-600">{formatCurrency(row.costOfGoods)}</td>
+                    <td className="py-3 px-4 text-right text-rose-600">{formatCurrency(row.expenses)}</td>
+                    <td className={`py-3 px-4 text-right font-bold ${row.netProfit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                       {formatCurrency(row.netProfit)}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <Badge variant="outline" className={`border ${row.netProfit >= 0 ? "bg-emerald-50/20 text-emerald-300" : "bg-rose-50/20 text-rose-300"}`}>
+                      <Badge variant="outline" className={`border ${row.netProfit >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
                         {row.netProfit >= 0 ? "Profit" : "Loss"}
                       </Badge>
                     </td>
-                    <td className={`py-3 px-4 text-center font-semibold ${margin >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                    <td className={`py-3 px-4 text-center font-semibold ${margin >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                       {formatPercent(margin)}
                     </td>
                   </tr>

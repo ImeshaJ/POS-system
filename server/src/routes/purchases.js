@@ -19,6 +19,7 @@ const formatFilters = (query = {}) => ({
   endDate: query.endDate || "",
   status: normalizeStatus(query.status),
   search: String(query.search || "").trim().toLowerCase(),
+  staffId: query.staffId ? Number(query.staffId) : null,
 });
 
 const buildWhereClause = (filters = {}, alias = "p") => {
@@ -56,6 +57,11 @@ const buildWhereClause = (filters = {}, alias = "p") => {
     );
   }
 
+  if (filters.staffId) {
+    values.push(filters.staffId);
+    clauses.push(`${alias}.user_id = $${values.length}`);
+  }
+
   return {
     whereClause: clauses.length ? `WHERE ${clauses.join(" AND ")}` : "",
     values,
@@ -64,11 +70,28 @@ const buildWhereClause = (filters = {}, alias = "p") => {
 
 const crudRouter = createCrudRouter({
   table: "purchases",
-  columns: ["supplier_id", "invoice_no", "date", "total", "status"],
+  columns: ["supplier_id", "invoice_no", "date", "total", "status", "user_id"],
   required: ["supplier_id", "date"],
 });
 
 const router = express.Router();
+
+router.get("/staff", verifyToken, async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT u.id, u.username
+       FROM users u
+       INNER JOIN purchases p ON p.user_id = u.id
+       ORDER BY u.username`
+    );
+    return res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
 
 router.get("/summary", verifyToken, async (req, res, next) => {
   try {
@@ -162,12 +185,15 @@ router.get("/summary", verifyToken, async (req, res, next) => {
           p.total,
           p.status,
           COALESCE(s.name, 'Unknown supplier') AS supplier,
-          COALESCE(SUM(pi.qty), 0)::int AS items
+          COALESCE(SUM(pi.qty), 0)::int AS items,
+          p.user_id,
+          u.username AS staff_username
          FROM purchases p
          LEFT JOIN suppliers s ON s.id = p.supplier_id
          LEFT JOIN purchase_items pi ON pi.purchase_id = p.id
+         LEFT JOIN users u ON u.id = p.user_id
          ${whereClause}
-         GROUP BY p.id, s.name
+         GROUP BY p.id, s.name, u.username
          ORDER BY COALESCE(p.date, p.created_at::date) DESC NULLS LAST, p.id DESC
          LIMIT 200`,
         values
@@ -227,6 +253,8 @@ router.get("/summary", verifyToken, async (req, res, next) => {
       status: row.status || "Pending",
       items: Number(row.items || 0),
       total: toNumber(row.total),
+      staffId: row.user_id,
+      staffName: row.staff_username || "—",
     }));
 
     const outstandingDue = toNumber(dueResult.rows[0]?.outstanding_due);
@@ -260,9 +288,11 @@ router.get("/summary", verifyToken, async (req, res, next) => {
 router.get("/:id/full", verifyToken, async (req, res, next) => {
   try {
     const purchaseResult = await pool.query(
-      `SELECT p.*, s.name AS supplier_name, s.code AS supplier_code, s.phone AS supplier_phone
+      `SELECT p.*, s.name AS supplier_name, s.code AS supplier_code, s.phone AS supplier_phone,
+              u.username AS staff_username, u.email AS staff_email
        FROM purchases p
        LEFT JOIN suppliers s ON s.id = p.supplier_id
+       LEFT JOIN users u ON u.id = p.user_id
        WHERE p.id = $1`,
       [req.params.id]
     );
@@ -338,11 +368,12 @@ router.post("/full", verifyToken, async (req, res, next) => {
   try {
     await client.query("BEGIN");
 
+    const userId = req.user?.id || null;
     const purchaseResult = await client.query(
-      `INSERT INTO purchases (supplier_id, invoice_no, date, total, status)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO purchases (supplier_id, invoice_no, date, total, status, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [supplier_id, invoice_no || null, purchaseDate, purchaseTotal, status]
+      [supplier_id, invoice_no || null, purchaseDate, purchaseTotal, status, userId]
     );
 
     const purchase = purchaseResult.rows[0];

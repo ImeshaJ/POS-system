@@ -12,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Trash2, Plus, ShoppingCart, CheckCircle, AlertCircle, MapPin, DollarSign } from "lucide-react"
+import { Trash2, Plus, ShoppingCart, CheckCircle, AlertCircle, MapPin, DollarSign, CreditCard } from "lucide-react"
 import { apiGet, apiPost } from "@/lib/api"
 import { useToast } from "@/components/common/Toast"
 
@@ -25,6 +25,8 @@ type ClientInfo = {
 type SaleItem = {
   id: number
   productId: number | null
+  itemType: "product" | "service" | "package" | "addon"
+  itemCode: string
   name: string
   price: number
   qty: number
@@ -34,6 +36,18 @@ type Product = {
   id: number
   name: string
   price: number
+}
+
+type SalesItem = {
+  id: number
+  type: "product" | "service" | "package" | "addon"
+  code: string
+  name: string
+  packageName: string | null
+  category: string
+  price: number
+  stockQty: number | null
+  status: string
 }
 
 type Customer = {
@@ -64,6 +78,18 @@ type ApiProduct = {
   id: number
   name: string
   selling_price?: number
+}
+
+type ApiSalesItem = {
+  id: number
+  type: "product" | "service" | "package" | "addon"
+  code: string
+  name: string
+  packageName: string | null
+  category: string
+  price: number
+  stockQty: number | null
+  status: string
 }
 
 type ApiClient = {
@@ -109,14 +135,21 @@ export default function NewSale() {
   const [receivedAmount, setReceivedAmount] = useState(0)
   const [note, setNote] = useState("")
 
+  // Card payment details
+  const [cardLastFour, setCardLastFour] = useState("")
+  const [cardType, setCardType] = useState<"visa" | "mastercard" | "amex" | "other">("visa")
+  const [cardApprovalCode, setCardApprovalCode] = useState("")
+
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const [products, setProducts] = useState<Product[]>([])
+  const [_products, setProducts] = useState<Product[]>([])
+  const [salesItems, setSalesItems] = useState<SalesItem[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [, setSearchQuery] = useState("")
 
   useEffect(() => {
     let mounted = true
@@ -125,8 +158,9 @@ export default function NewSale() {
       try {
         setLoading(true)
         setError(null)
-        const [productsRes, clientsRes, petsRes] = await Promise.all([
+        const [productsRes, salesItemsRes, clientsRes, petsRes] = await Promise.all([
           apiGet<ApiProduct[]>("/api/products?limit=1000"),
+          apiGet<ApiSalesItem[]>("/api/sales-items/all?limit=500"),
           apiGet<ApiClient[]>("/api/clients?limit=1000"),
           apiGet<ApiPet[]>("/api/pets?limit=2000"),
         ])
@@ -137,6 +171,19 @@ export default function NewSale() {
           id: p.id,
           name: p.name,
           price: Number(p.selling_price || 0),
+        }))
+
+        // Load combined sales items (products + services + packages + addons)
+        const loadedSalesItems = (salesItemsRes.data || []).map((item) => ({
+          id: item.id,
+          type: item.type,
+          code: item.code,
+          name: item.name,
+          packageName: item.packageName,
+          category: item.category,
+          price: Number(item.price || 0),
+          stockQty: item.stockQty,
+          status: item.status,
         }))
 
         const petsByClient = new Map<number, ApiPet[]>()
@@ -172,6 +219,7 @@ export default function NewSale() {
         })
 
         setProducts(loadedProducts)
+        setSalesItems(loadedSalesItems)
         setCustomers(loadedCustomers)
       } catch (err) {
         if (!mounted) return
@@ -190,7 +238,7 @@ export default function NewSale() {
   const addItem = () => {
     setItems((prev) => [
       ...prev,
-      { id: Date.now(), productId: null, name: "", price: 0, qty: 1 },
+      { id: Date.now(), productId: null, itemType: "product", itemCode: "", name: "", price: 0, qty: 1 },
     ])
   }
 
@@ -206,14 +254,33 @@ export default function NewSale() {
     setItems((prev) => prev.filter((item) => item.id !== id))
   }
 
-  const selectProduct = (itemId: number, product: Product) => {
+  const selectSalesItem = (itemId: number, salesItem: SalesItem) => {
+    // For services/packages/addons, productId is null since they're not products
+    const productId = salesItem.type === "product" ? salesItem.id : null
     updateItem(itemId, {
-      productId: product.id,
-      name: product.name,
-      price: product.price,
+      productId,
+      itemType: salesItem.type,
+      itemCode: salesItem.code,
+      name: salesItem.name,
+      price: salesItem.price,
       qty: 1,
     })
     setActiveItemId(null)
+  }
+
+  const getItemTypeBadge = (type: SalesItem["type"]) => {
+    switch (type) {
+      case "product":
+        return { label: "Product", color: "bg-blue-100 text-blue-700" }
+      case "service":
+        return { label: "Service", color: "bg-green-100 text-green-700" }
+      case "package":
+        return { label: "Package", color: "bg-purple-100 text-purple-700" }
+      case "addon":
+        return { label: "Add-on", color: "bg-orange-100 text-orange-700" }
+      default:
+        return { label: "Item", color: "bg-gray-100 text-gray-700" }
+    }
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0)
@@ -270,6 +337,10 @@ export default function NewSale() {
         minute: "2-digit",
       })
 
+      // Use the enhanced /api/sales/full endpoint that handles:
+      // - Stock reduction for products
+      // - No stock changes for services/packages/addons
+      // - Client due amount tracking
       const salePayload = {
         invoice_no: invoiceNo,
         client_id: selectedClientId || undefined,
@@ -282,24 +353,37 @@ export default function NewSale() {
         discount: discountAmount,
         total,
         payment_type: paymentMethod,
+        received_amount: receivedAmount,
         status: "Completed",
+        // Card payment details (only when payment_type is "card")
+        ...(paymentMethod === "card" && {
+          card_last_four: cardLastFour || null,
+          card_type: cardType || null,
+          card_approval_code: cardApprovalCode || null,
+        }),
+        items: items.map((item) => ({
+          item_type: item.itemType || "product",
+          item_id: item.productId,
+          item_code: item.itemCode || "",
+          name: item.name,
+          price: item.price,
+          qty: item.qty,
+        })),
       }
 
-      const saleRes = await apiPost<{ id: number }>("/api/sales", salePayload)
-      const saleId = saleRes.data?.id
+      const saleRes = await apiPost<{
+        id: number
+        stock_updates?: Array<{ product_name: string; new_quantity: number; reduced_by: number }>
+        payment_summary?: { total: number; received: number; due: number; status: string }
+      }>("/api/sales/full", salePayload)
 
-      if (saleId) {
-        await Promise.all(
-          items.map((item) =>
-            apiPost("/api/sale-items", {
-              sale_id: saleId,
-              product_id: item.productId || undefined,
-              name: item.name,
-              price: item.price,
-              qty: item.qty,
-            })
-          )
-        )
+      // Show stock update info if any products were sold
+      const stockUpdates = saleRes.data?.stock_updates || []
+      if (stockUpdates.length > 0) {
+        const lowStockItems = stockUpdates.filter((u) => u.new_quantity <= 5)
+        if (lowStockItems.length > 0) {
+          toast.warning(`Low stock alert: ${lowStockItems.map((i) => i.product_name).join(", ")}`)
+        }
       }
 
       setShowSuccess(true)
@@ -551,31 +635,83 @@ export default function NewSale() {
                         <div className="col-span-5 relative">
                           <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Product / Service</label>
                           <Input
-                            placeholder="Search product..."
+                            placeholder="Search products, services, packages..."
                             value={item.name}
-                            onFocus={() => setActiveItemId(item.id)}
-                            onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                            onFocus={() => {
+                              setActiveItemId(item.id)
+                              setSearchQuery(item.name)
+                            }}
+                            onChange={(e) => {
+                              updateItem(item.id, { name: e.target.value })
+                              setSearchQuery(e.target.value)
+                            }}
                             className="text-sm font-medium border-2 border-gray-300 rounded-lg focus:border-blue-600 transition-colors"
                           />
                           {activeItemId === item.id && item.name && (
-                            <div className="absolute bg-white border-2 border-gray-300 rounded-lg w-full z-20 shadow-xl mt-1 max-h-56 overflow-y-auto">
-                              {products
-                                .filter((p) =>
-                                  p.name.toLowerCase().includes(item.name.toLowerCase())
+                            <div className="absolute bg-white border-2 border-gray-300 rounded-xl w-full z-20 shadow-2xl mt-1 max-h-72 overflow-y-auto">
+                              {salesItems
+                                .filter((si) =>
+                                  si.name.toLowerCase().includes(item.name.toLowerCase()) ||
+                                  si.code.toLowerCase().includes(item.name.toLowerCase()) ||
+                                  (si.category && si.category.toLowerCase().includes(item.name.toLowerCase())) ||
+                                  (si.packageName && si.packageName.toLowerCase().includes(item.name.toLowerCase()))
                                 )
-                                .map((p) => (
-                                  <div
-                                    key={p.id}
-                                    className="p-3 hover:bg-blue-100 cursor-pointer text-sm border-b last:border-b-0 transition-colors"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault()
-                                      selectProduct(item.id, p)
-                                    }}
-                                  >
-                                    <div className="font-semibold text-gray-900">{p.name}</div>
-                                    <div className="text-xs text-blue-600 font-bold">Rs. {p.price.toLocaleString()}</div>
-                                  </div>
-                                ))}
+                                .slice(0, 20)
+                                .map((si) => {
+                                  const badge = getItemTypeBadge(si.type)
+                                  return (
+                                    <div
+                                      key={`${si.type}-${si.id}`}
+                                      className="p-3 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-b-0 transition-colors"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault()
+                                        selectSalesItem(item.id, si)
+                                      }}
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-semibold text-gray-900 truncate">{si.name}</span>
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${badge.color}`}>
+                                              {badge.label}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                                            <span className="font-mono">{si.code}</span>
+                                            {si.packageName && (
+                                              <>
+                                                <span className="text-gray-300">•</span>
+                                                <span className="text-purple-600">{si.packageName}</span>
+                                              </>
+                                            )}
+                                            {si.type === "product" && si.stockQty !== null && (
+                                              <>
+                                                <span className="text-gray-300">•</span>
+                                                <span className={si.stockQty > 0 ? "text-green-600" : "text-red-600"}>
+                                                  Stock: {si.stockQty}
+                                                </span>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                          <div className="text-sm font-bold text-blue-600">
+                                            Rs. {si.price.toLocaleString()}
+                                          </div>
+                                          <div className="text-[10px] text-gray-400">{si.category}</div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              {salesItems.filter((si) =>
+                                si.name.toLowerCase().includes(item.name.toLowerCase()) ||
+                                si.code.toLowerCase().includes(item.name.toLowerCase())
+                              ).length === 0 && (
+                                <div className="p-4 text-center text-gray-500 text-sm">
+                                  No items found matching "{item.name}"
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -724,6 +860,66 @@ export default function NewSale() {
                   <option value="transfer">Bank Transfer</option>
                 </select>
               </div>
+
+              {/* Card Payment Details */}
+              {paymentMethod === "card" && (
+                <div className="space-y-2 p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CreditCard className="h-4 w-4 text-blue-600" />
+                    <span className="text-xs font-bold text-blue-700 uppercase">Card Details</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Card Type</label>
+                      <select
+                        value={cardType}
+                        onChange={(e) => setCardType(e.target.value as "visa" | "mastercard" | "amex" | "other")}
+                        className="w-full border-2 border-gray-300 rounded-lg p-2 text-xs bg-white font-medium focus:border-blue-600 transition-colors"
+                      >
+                        <option value="visa">Visa</option>
+                        <option value="mastercard">Mastercard</option>
+                        <option value="amex">Amex</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">Last 4 Digits</label>
+                      <Input
+                        type="text"
+                        maxLength={4}
+                        placeholder="1234"
+                        value={cardLastFour}
+                        onChange={(e) => setCardLastFour(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        className="border-2 border-gray-300 rounded-lg text-xs font-mono focus:border-blue-600 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Approval Code</label>
+                    <Input
+                      type="text"
+                      placeholder="Terminal approval code"
+                      value={cardApprovalCode}
+                      onChange={(e) => setCardApprovalCode(e.target.value)}
+                      className="border-2 border-gray-300 rounded-lg text-xs font-mono focus:border-blue-600 transition-colors"
+                    />
+                  </div>
+
+                  {cardLastFour && (
+                    <div className="flex items-center gap-2 mt-2 p-2 bg-white rounded border border-blue-200">
+                      <CreditCard className="h-4 w-4 text-blue-500" />
+                      <span className="text-xs font-medium text-gray-700">
+                        {cardType.charAt(0).toUpperCase() + cardType.slice(1)} ****{cardLastFour}
+                      </span>
+                      {cardApprovalCode && (
+                        <span className="text-xs text-gray-500">• Approval: {cardApprovalCode}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1 block">Received Amount</label>

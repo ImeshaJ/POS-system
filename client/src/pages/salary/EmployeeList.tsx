@@ -25,7 +25,7 @@ type Employee = {
 }
 
 const DEPARTMENTS = ["HR", "Medical", "Surgery", "Pharmacy", "Reception", "Nursing", "Lab", "Support"]
-const ROLES = ["Doctor", "Nurse", "Assistant", "Receptionist", "Manager", "Pharmacist", "Lab Technician", "Other"]
+const ROLES = ["Veterinarian", "Nurse", "Assistant", "Receptionist", "Manager", "Pharmacist", "Lab Technician", "Other"]
 
 export default function EmployeeList() {
   const toast = useToast()

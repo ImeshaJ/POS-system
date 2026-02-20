@@ -12,6 +12,7 @@ const appointmentColumns = [
   "pet_id",
   "pet_name",
   "pet_type",
+  "animal_type",
   "age",
   "weight",
   "last_visit",

@@ -24,7 +24,7 @@ import {
   Trash2,
   X,
 } from "lucide-react"
-import { apiDelete, apiGet } from "@/lib/api"
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api"
 import { useToast } from "@/components/common/Toast"
 import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
@@ -43,6 +43,27 @@ interface AddonSupport {
   name: string
   price: string
   description: string
+}
+
+interface ApiServicePackage {
+  id: number
+  name: string
+  price: string
+  description: string | null
+  duration_days: number
+  duration_hours: number
+  duration_minutes: number
+  status: string
+  service_type_code: string
+}
+
+interface ApiAddOnService {
+  id: number
+  name: string
+  price: string
+  description: string | null
+  status: string
+  service_type_code: string
 }
 
 type AppointmentStatus = "Scheduled" | "Completed" | "Cancelled" | "No-Show"
@@ -81,6 +102,15 @@ type SessionDetail = {
   painScaleCaptured: boolean
   rangeRecorded: boolean
   ownerTrained: boolean
+}
+
+type ApiPhysiotherapySession = {
+  id: number
+  appointment_id: number
+  assessment_summary: string | null
+  modalities_applied: string | null
+  home_exercise_plan: string | null
+  follow_up_date: string | null
 }
 
 type SessionChecklistKey = keyof Pick<
@@ -218,8 +248,9 @@ export default function PhysiotherapyServices() {
   const [selectedSession, setSelectedSession] = useState<TherapySession | null>(null)
   const [detailForm, setDetailForm] = useState<SessionDetail>(createDefaultDetail())
   const [detailSaving, setDetailSaving] = useState(false)
-  const [sessionDetails, setSessionDetails] = useState<Record<string, SessionDetail>>({})
   const [sessionHistory, setSessionHistory] = useState<SessionHistoryEntry[]>([])
+  const [physiotherapySessionId, setPhysiotherapySessionId] = useState<number | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   const therapyKeywords = useMemo(() => THERAPY_KEYWORDS.map((keyword) => keyword.toLowerCase()), [])
 
@@ -241,9 +272,46 @@ export default function PhysiotherapyServices() {
     }
   }, [therapyKeywords])
 
+  const fetchPackages = useCallback(async () => {
+    try {
+      const res = await apiGet<ApiServicePackage[]>("/api/service-types/packages/by-type/physiotherapy")
+      if (res.data.length > 0) {
+        setPackages(res.data.map(pkg => ({
+          id: pkg.id,
+          name: pkg.name,
+          price: `Rs. ${parseFloat(pkg.price).toLocaleString()}`,
+          description: pkg.description || "",
+          duration: pkg.duration_days ? `${pkg.duration_days} days` : pkg.duration_hours ? `${pkg.duration_hours} hours` : "",
+          focus: "Rehabilitation",
+          active: pkg.status === "active"
+        })))
+      }
+    } catch {
+      // Use default packages if API fails
+    }
+  }, [])
+
+  const fetchSupportServices = useCallback(async () => {
+    try {
+      const res = await apiGet<ApiAddOnService[]>("/api/service-types/addons/by-type/physiotherapy")
+      if (res.data.length > 0) {
+        setSupportServices(res.data.map(addon => ({
+          id: addon.id,
+          name: addon.name,
+          price: `Rs. ${parseFloat(addon.price).toLocaleString()}`,
+          description: addon.description || ""
+        })))
+      }
+    } catch {
+      // Use default services if API fails
+    }
+  }, [])
+
   useEffect(() => {
     fetchSessions()
-  }, [fetchSessions])
+    fetchPackages()
+    fetchSupportServices()
+  }, [fetchSessions, fetchPackages, fetchSupportServices])
 
   const totalSessions = sessions.length
 
@@ -430,14 +498,38 @@ export default function PhysiotherapyServices() {
     setDeleteServiceId(null)
   }
 
-  const openSessionDetail = (session: TherapySession) => {
+  const openSessionDetail = async (session: TherapySession) => {
     setSelectedSession(session)
-    setDetailForm(sessionDetails[session.id] ?? createDefaultDetail())
+    setDetailLoading(true)
+    setPhysiotherapySessionId(null)
+    setDetailForm(createDefaultDetail())
+    try {
+      const res = await apiGet<ApiPhysiotherapySession>(`/api/services-extension/physiotherapy-sessions/by-appointment/${session.id}`)
+      const data = res.data
+      setPhysiotherapySessionId(data.id)
+      setDetailForm({
+        assessmentSummary: data.assessment_summary || "",
+        modalitiesApplied: data.modalities_applied || "",
+        homeExercisePlan: data.home_exercise_plan || "",
+        followUpDate: data.follow_up_date ? data.follow_up_date.slice(0, 10) : "",
+        precautions: "",
+        goalsProgress: "",
+        assessmentComplete: false,
+        painScaleCaptured: false,
+        rangeRecorded: false,
+        ownerTrained: false,
+      })
+    } catch {
+      // No existing record - use defaults
+    } finally {
+      setDetailLoading(false)
+    }
   }
 
   const closeSessionDetail = () => {
     setSelectedSession(null)
     setDetailForm(createDefaultDetail())
+    setPhysiotherapySessionId(null)
     setDetailSaving(false)
   }
 
@@ -445,29 +537,46 @@ export default function PhysiotherapyServices() {
     setDetailForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleSaveDetail = () => {
+  const handleSaveDetail = async () => {
     if (!selectedSession) return
     setDetailSaving(true)
-    setSessionDetails((prev) => ({ ...prev, [selectedSession.id]: detailForm }))
-    setSessionHistory((prev) => {
-      const entry: SessionHistoryEntry = {
-        sessionId: selectedSession.id,
-        session: selectedSession,
-        detail: detailForm,
-        updatedAt: Date.now(),
+    try {
+      const payload = {
+        appointment_id: Number(selectedSession.id),
+        assessment_summary: detailForm.assessmentSummary,
+        modalities_applied: detailForm.modalitiesApplied,
+        home_exercise_plan: detailForm.homeExercisePlan,
+        follow_up_date: detailForm.followUpDate || null,
       }
-      const index = prev.findIndex((item) => item.sessionId === selectedSession.id)
-      if (index === -1) {
-        return [entry, ...prev]
+      if (physiotherapySessionId) {
+        await apiPut(`/api/services-extension/physiotherapy-sessions/${physiotherapySessionId}`, payload)
+        toast.success("Physiotherapy details updated successfully")
+      } else {
+        const res = await apiPost<ApiPhysiotherapySession>("/api/services-extension/physiotherapy-sessions", payload)
+        setPhysiotherapySessionId(res.data.id)
+        toast.success("Physiotherapy details saved successfully")
       }
-      const clone = [...prev]
-      clone[index] = entry
-      return clone
-    })
-    setTimeout(() => {
-      setDetailSaving(false)
+      setSessionHistory((prev) => {
+        const entry: SessionHistoryEntry = {
+          sessionId: selectedSession.id,
+          session: selectedSession,
+          detail: detailForm,
+          updatedAt: Date.now(),
+        }
+        const index = prev.findIndex((item) => item.sessionId === selectedSession.id)
+        if (index === -1) {
+          return [entry, ...prev]
+        }
+        const clone = [...prev]
+        clone[index] = entry
+        return clone
+      })
       closeSessionDetail()
-    }, 250)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save physiotherapy details")
+    } finally {
+      setDetailSaving(false)
+    }
   }
 
   const handleDeleteSessionClick = (sessionId: string) => {
@@ -480,12 +589,6 @@ export default function PhysiotherapyServices() {
     try {
       await apiDelete(`/api/appointments/${deleteSessionId}`)
       setSessions((prev) => prev.filter((session) => session.id !== deleteSessionId))
-      setSessionDetails((prev) => {
-        if (!prev[deleteSessionId]) return prev
-        const next = { ...prev }
-        delete next[deleteSessionId]
-        return next
-      })
       setSessionHistory((prev) => prev.filter((entry) => entry.sessionId !== deleteSessionId))
       toast.success("Session deleted successfully")
     } catch (error) {
@@ -498,7 +601,7 @@ export default function PhysiotherapyServices() {
 
   const handleExportLedger = () => {
     if (!filteredSessions.length) return
-    const headers = ["Pet", "Client", "Date", "Time", "Reason", "Doctor", "Status"]
+    const headers = ["Pet", "Client", "Date", "Time", "Reason", "Veterinarian", "Status"]
     const rows = filteredSessions.map((session) => [
       session.pet,
       session.client,
@@ -977,85 +1080,93 @@ export default function PhysiotherapyServices() {
               </button>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <Label>Assessment summary</Label>
-                  <textarea
-                    className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.assessmentSummary}
-                    onChange={(event) => updateDetailField("assessmentSummary", event.target.value)}
-                  />
+              {detailLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader />
                 </div>
-                <div>
-                  <Label>Modalities used</Label>
-                  <textarea
-                    className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.modalitiesApplied}
-                    onChange={(event) => updateDetailField("modalitiesApplied", event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Home exercise plan</Label>
-                  <textarea
-                    className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.homeExercisePlan}
-                    onChange={(event) => updateDetailField("homeExercisePlan", event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Follow-up date</Label>
-                  <Input
-                    type="date"
-                    value={detailForm.followUpDate}
-                    onChange={(event) => updateDetailField("followUpDate", event.target.value)}
-                    className="mt-2 rounded-2xl"
-                  />
-                </div>
-                <div>
-                  <Label>Precautions</Label>
-                  <textarea
-                    className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.precautions}
-                    onChange={(event) => updateDetailField("precautions", event.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Goals / progress notes</Label>
-                  <textarea
-                    className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
-                    rows={3}
-                    value={detailForm.goalsProgress}
-                    onChange={(event) => updateDetailField("goalsProgress", event.target.value)}
-                  />
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <Label>Assessment summary</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.assessmentSummary}
+                        onChange={(event) => updateDetailField("assessmentSummary", event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Modalities used</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.modalitiesApplied}
+                        onChange={(event) => updateDetailField("modalitiesApplied", event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Home exercise plan</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.homeExercisePlan}
+                        onChange={(event) => updateDetailField("homeExercisePlan", event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Follow-up date</Label>
+                      <Input
+                        type="date"
+                        value={detailForm.followUpDate}
+                        onChange={(event) => updateDetailField("followUpDate", event.target.value)}
+                        className="mt-2 rounded-2xl"
+                      />
+                    </div>
+                    <div>
+                      <Label>Precautions</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.precautions}
+                        onChange={(event) => updateDetailField("precautions", event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Goals / progress notes</Label>
+                      <textarea
+                        className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                        rows={3}
+                        value={detailForm.goalsProgress}
+                        onChange={(event) => updateDetailField("goalsProgress", event.target.value)}
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {SESSION_CHECKS.map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-2 rounded-2xl border border-gray-200 p-3 text-sm font-semibold text-foreground">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={detailForm[key] as boolean}
-                      onChange={(event) => updateDetailField(key, event.target.checked as SessionDetail[typeof key])}
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {SESSION_CHECKS.map(({ key, label }) => (
+                      <label key={key} className="flex items-center gap-2 rounded-2xl border border-gray-200 p-3 text-sm font-semibold text-foreground">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={detailForm[key] as boolean}
+                          onChange={(event) => updateDetailField(key, event.target.checked as SessionDetail[typeof key])}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
 
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={closeSessionDetail} className="rounded-2xl">
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveDetail} disabled={detailSaving} className="rounded-2xl bg-[#4338ca] text-white">
-                  {detailSaving ? "Saving…" : "Save details"}
-                </Button>
-              </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={closeSessionDetail} className="rounded-2xl">
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveDetail} disabled={detailSaving} className="rounded-2xl bg-[#4338ca] text-white">
+                      {detailSaving ? "Saving…" : "Save details"}
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

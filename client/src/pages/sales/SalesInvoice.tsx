@@ -1,19 +1,14 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { Printer, Mail, ArrowLeft, MapPin, Phone, Mail as MailIcon } from "lucide-react"
+import { Printer, Mail, ArrowLeft, Download, Receipt } from "lucide-react"
 import { apiGet, apiPost } from "@/lib/api"
 import { useToast } from "@/components/common/Toast"
+import InvoiceA4 from "@/components/invoice/InvoiceA4"
+import type { InvoiceData, CompanyInfo } from "@/components/invoice/InvoiceA4"
+import html2pdf from "html2pdf.js"
 
 /* ---------------- COMPANY ---------------- */
-type CompanyInfo = {
-  name: string
-  address: string
-  phone: string
-  email: string
-  logo: string
-}
-
 const DEFAULT_COMPANY: CompanyInfo = {
   name: "Furry Friends",
   address: "No4, Old Kesbewa Road, Gangodawila, Nugegoda",
@@ -28,6 +23,10 @@ type ShopSettings = {
   phone: string
   email: string
   vatNumber?: string
+  website?: string
+  bankName?: string
+  bankAccount?: string
+  bankBranch?: string
 }
 
 type SaleItem = {
@@ -79,6 +78,8 @@ type Sale = {
     clientName?: string
     petName?: string
   }
+  receivedAmount?: number
+  change?: number
 }
 
 export default function SalesInvoice() {
@@ -86,10 +87,12 @@ export default function SalesInvoice() {
   const navigate = useNavigate()
   const { invoiceNo } = useParams()
   const toast = useToast()
+  const invoiceRef = useRef<HTMLDivElement>(null)
   const [sale, setSale] = useState<Sale | null>((location.state as Sale) || null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [company, setCompany] = useState<CompanyInfo>(DEFAULT_COMPANY)
+  const [downloading, setDownloading] = useState(false)
 
   // Fetch company info from settings API
   useEffect(() => {
@@ -103,6 +106,11 @@ export default function SalesInvoice() {
             phone: res.data.phone || DEFAULT_COMPANY.phone,
             email: res.data.email || DEFAULT_COMPANY.email,
             logo: DEFAULT_COMPANY.logo,
+            vatNumber: res.data.vatNumber,
+            website: res.data.website,
+            bankName: res.data.bankName,
+            bankAccount: res.data.bankAccount,
+            bankBranch: res.data.bankBranch,
           })
         }
       } catch {
@@ -158,6 +166,7 @@ export default function SalesInvoice() {
           petName: found.pet_name || "",
           total: Number(found.total || 0),
           payment: found.payment_type || "Cash",
+          paymentType: found.payment_type || "Cash",
           status: found.status || "Completed",
           items,
           subtotal: Number(found.subtotal || found.total || 0),
@@ -184,42 +193,206 @@ export default function SalesInvoice() {
     return <div className="p-6 text-center text-gray-600">{error || "Invoice not found"}</div>
   }
 
+  const safeSubtotal = Number(sale.subtotal ?? sale.total ?? 0)
+  const safeVat = Number(sale.vat || 0)
+  const safeDiscount = Number(sale.discount || 0)
+  const total = safeSubtotal + safeVat - safeDiscount
+
+  // Convert sale to InvoiceData format
+  const invoiceData: InvoiceData = {
+    invoiceNo: sale.invoiceNo || sale.id || "",
+    date: sale.date || new Date().toISOString().split("T")[0],
+    time: sale.time,
+    customer: sale.customer || sale.client?.clientName || "Guest",
+    petName: sale.petName || sale.client?.petName,
+    items: sale.items || [],
+    subtotal: safeSubtotal,
+    vat: safeVat,
+    discount: safeDiscount,
+    total: total,
+    paymentType: sale.paymentType || sale.payment || "Cash",
+    status: sale.status || "Completed",
+  }
+
   const printReceipt = () => {
     navigate("/sales/receipt-80mm", { state: sale })
   }
 
   const printInvoice = () => {
-    const style = document.createElement("style");
-    style.innerHTML = `
-      @page {
-        margin: 20mm 15mm 20mm 15mm;
-        size: A4;
-      }
-      @media print {
-        html, body {
-          margin: 0 !important;
-          padding: 0 !important;
-          width: 100% !important;
-          height: 100% !important;
-        }
-        body {
-          display: block !important;
-        }
-        * {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-          color-adjust: exact !important;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-    
+    const printContent = document.getElementById("invoice-a4-print")
+    if (!printContent) return
+
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) {
+      toast.error("Please allow popups to print")
+      return
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Invoice ${invoiceData.invoiceNo}</title>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+          <style>
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            body {
+              font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+              font-size: 14px;
+              line-height: 1.5;
+              color: #1f2937;
+              background: white;
+              padding: 20mm 15mm;
+            }
+            @page {
+              size: A4;
+              margin: 0;
+            }
+            @media print {
+              body {
+                padding: 20mm 15mm;
+              }
+              * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+            }
+            .text-\\[\\#002366\\] { color: #002366; }
+            .bg-\\[\\#002366\\] { background-color: #002366; }
+            .border-\\[\\#002366\\] { border-color: #002366; }
+            .bg-gray-50 { background-color: #f9fafb; }
+            .bg-gray-100 { background-color: #f3f4f6; }
+            .bg-green-100 { background-color: #dcfce7; }
+            .bg-yellow-100 { background-color: #fef9c3; }
+            .bg-blue-50 { background-color: #eff6ff; }
+            .bg-yellow-50 { background-color: #fefce8; }
+            .text-white { color: white; }
+            .text-gray-500 { color: #6b7280; }
+            .text-gray-600 { color: #4b5563; }
+            .text-gray-900 { color: #111827; }
+            .text-red-600 { color: #dc2626; }
+            .text-green-800 { color: #166534; }
+            .text-yellow-800 { color: #854d0e; }
+            .font-bold { font-weight: 700; }
+            .font-semibold { font-weight: 600; }
+            .font-medium { font-weight: 500; }
+            .text-xs { font-size: 12px; }
+            .text-sm { font-size: 14px; }
+            .text-lg { font-size: 18px; }
+            .text-xl { font-size: 20px; }
+            .text-2xl { font-size: 24px; }
+            .text-4xl { font-size: 36px; }
+            .uppercase { text-transform: uppercase; }
+            .capitalize { text-transform: capitalize; }
+            .tracking-wider { letter-spacing: 0.05em; }
+            .tracking-tight { letter-spacing: -0.025em; }
+            .rounded-lg { border-radius: 8px; }
+            .rounded-tl-lg { border-top-left-radius: 8px; }
+            .rounded-tr-lg { border-top-right-radius: 8px; }
+            .rounded-full { border-radius: 9999px; }
+            .border { border-width: 1px; }
+            .border-b { border-bottom-width: 1px; }
+            .border-b-2 { border-bottom-width: 2px; }
+            .border-t-2 { border-top-width: 2px; }
+            .border-gray-200 { border-color: #e5e7eb; }
+            .border-blue-100 { border-color: #dbeafe; }
+            .border-yellow-100 { border-color: #fef3c7; }
+            .p-4 { padding: 16px; }
+            .px-2 { padding-left: 8px; padding-right: 8px; }
+            .px-4 { padding-left: 16px; padding-right: 16px; }
+            .py-2 { padding-top: 8px; padding-bottom: 8px; }
+            .py-3 { padding-top: 12px; padding-bottom: 12px; }
+            .py-0\\.5 { padding-top: 2px; padding-bottom: 2px; }
+            .pb-6 { padding-bottom: 24px; }
+            .pt-6 { padding-top: 24px; }
+            .mt-1 { margin-top: 4px; }
+            .mt-2 { margin-top: 8px; }
+            .mt-6 { margin-top: 24px; }
+            .mt-8 { margin-top: 32px; }
+            .mb-1 { margin-bottom: 4px; }
+            .mb-2 { margin-bottom: 8px; }
+            .mb-8 { margin-bottom: 32px; }
+            .gap-2 { gap: 8px; }
+            .gap-4 { gap: 16px; }
+            .gap-8 { gap: 32px; }
+            .flex { display: flex; }
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+            .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+            .justify-between { justify-content: space-between; }
+            .justify-end { justify-content: flex-end; }
+            .items-start { align-items: flex-start; }
+            .text-left { text-align: left; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .inline-block { display: inline-block; }
+            .inline-flex { display: inline-flex; }
+            .w-full { width: 100%; }
+            .w-80 { width: 320px; }
+            .max-w-\\[250px\\] { max-width: 250px; }
+            .h-16 { height: 64px; }
+            .w-16 { width: 64px; }
+            .object-contain { object-fit: contain; }
+            .whitespace-pre-line { white-space: pre-line; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { padding: 12px 16px; }
+            .opacity-80 { opacity: 0.8; }
+            .-mx-4 { margin-left: -16px; margin-right: -16px; }
+            .-mb-4 { margin-bottom: -16px; }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+
     setTimeout(() => {
-      window.print();
-      document.head.removeChild(style);
-    }, 100);
+      printWindow.print()
+      printWindow.close()
+    }, 500)
   }
 
+  const downloadPDF = async () => {
+    const element = document.getElementById("invoice-a4-print")
+    if (!element) {
+      toast.error("Invoice not found")
+      return
+    }
+
+    setDownloading(true)
+
+    try {
+      const opt = {
+        margin: [15, 15, 15, 15] as [number, number, number, number],
+        filename: `Invoice_${invoiceData.invoiceNo}.pdf`,
+        image: { type: "jpeg" as const, quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+        },
+        jsPDF: {
+          unit: "mm" as const,
+          format: "a4" as const,
+          orientation: "portrait" as const
+        },
+      }
+
+      await html2pdf().set(opt).from(element).save()
+      toast.success("PDF downloaded successfully")
+    } catch (err) {
+      console.error("PDF generation error:", err)
+      toast.error("Failed to generate PDF")
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const emailInvoice = async () => {
     const to = window.prompt("Enter customer email")
@@ -233,191 +406,75 @@ export default function SalesInvoice() {
       toast.error(error instanceof Error ? error.message : "Email failed")
     }
   }
-  const safeSubtotal = Number(sale.subtotal ?? sale.total ?? 0)
-  const safeVat = Number(sale.vat || 0)
-  const safeDiscount = Number(sale.discount || 0)
-  const total = safeSubtotal + safeVat - safeDiscount
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <style>{`
-        @page {
-          size: A4;
-          margin: 20mm 15mm 20mm 15mm;
-          @bottom-left {
-            content: none;
-          }
-          @bottom-right {
-            content: none;
-          }
-          @top-left {
-            content: none;
-          }
-          @top-right {
-            content: none;
-          }
-        }
-        @media print {
-          * {
-            margin: 0;
-            padding: 0;
-          }
-          body {
-            margin: 0;
-            padding: 0;
-          }
-          body * {
-            visibility: hidden;
-          }
-          #invoice-print, #invoice-print * {
-            visibility: visible;
-          }
-          #invoice-print {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            margin: 0;
-            padding: 20mm 15mm;
-            box-sizing: border-box;
-          }
-        }
-      `}</style>
-      <div className="max-w-2xl mx-auto">
-        <div className="flex justify-between items-center mb-6 print:hidden">
-          <Button variant="outline" onClick={() => navigate(-1)} className="h-9 text-sm">
+    <div className="min-h-screen bg-gray-100 p-4 md:p-8">
+      {/* Action Bar */}
+      <div className="max-w-4xl mx-auto mb-6">
+        <div className="flex flex-wrap justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm">
+          <Button
+            variant="outline"
+            onClick={() => navigate(-1)}
+            className="h-10"
+          >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={printInvoice} className="h-9 text-sm">
-              <Printer className="w-4 h-4 mr-2" />
-              Print Invoice
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={printReceipt}
+              className="h-10 text-sm"
+            >
+              <Receipt className="w-4 h-4 mr-2" />
+              Print Receipt (POS)
             </Button>
-            <Button variant="outline" onClick={printReceipt} className="h-9 text-sm">
+            <Button
+              variant="outline"
+              onClick={printInvoice}
+              className="h-10 text-sm"
+            >
               <Printer className="w-4 h-4 mr-2" />
-              Print Receipt
+              Print Invoice (A4)
             </Button>
-            <Button onClick={emailInvoice} className="h-9 text-sm bg-linear-to-r from-[#002366] to-[#003a99] text-white">
+            <Button
+              variant="outline"
+              onClick={downloadPDF}
+              disabled={downloading}
+              className="h-10 text-sm"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {downloading ? "Generating..." : "Download PDF"}
+            </Button>
+            <Button
+              onClick={emailInvoice}
+              className="h-10 text-sm bg-[#002366] hover:bg-[#001a4d] text-white"
+            >
               <Mail className="w-4 h-4 mr-2" />
-              Email
+              Email Invoice
             </Button>
           </div>
         </div>
+      </div>
 
-        <div id="invoice-print" className="bg-white p-4 rounded-lg shadow-lg print:shadow-none print:p-0 print:rounded-none">
-          <div className="grid grid-cols-2 gap-6 mb-4">
-            <div className="flex items-start gap-3 min-w-0">
-              {company.logo && (
-                <img src={company.logo} alt="logo" className="h-12 w-12 object-contain shrink-0" />
-              )}
-              <div className="min-w-0">
-                <h1 className="text-xl font-bold text-[#002366] wrap-break-word whitespace-normal">{company.name}</h1>
-                <div className="space-y-1 mt-2">
-                  <div className="flex items-start gap-2">
-                    <MapPin size={14} className="text-[#002366] shrink-0 mt-0.5" />
-                    <p className="text-xs text-gray-600 wrap-break-word">{company.address}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone size={14} className="text-[#002366] shrink-0" />
-                    <p className="text-xs text-gray-600">{company.phone}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MailIcon size={14} className="text-[#002366] shrink-0" />
-                    <p className="text-xs text-gray-600 wrap-break-word">{company.email}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="text-right min-w-0">
-              <div className="bg-linear-to-br p-2 min-w-0">
-                <p className="text-xs text-gray-600 font-semibold wrap-break-word whitespace-normal">INVOICE</p>
-                <p className="text-lg font-bold text-[#002366] wrap-break-word whitespace-normal">{sale.invoiceNo || sale.id}</p>
-                <p className="text-xs text-gray-600 wrap-break-word whitespace-normal">{sale.date}</p>
-                <p className="text-xs text-gray-600 wrap-break-word whitespace-normal">{sale.time || new Date().toLocaleTimeString()}</p>
-              </div>
-            </div>
-          </div>
+      {/* Invoice Preview */}
+      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8 md:p-12">
+        <InvoiceA4
+          ref={invoiceRef}
+          invoice={invoiceData}
+          company={company}
+        />
+      </div>
 
-          <div className="border-t border-[#002366] pt-3 mb-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-bold text-gray-600 mb-1">Bill To</p>
-                <p className="text-sm font-bold text-gray-900">{sale.customer || sale.client?.clientName || "Guest"}</p>
-                {(sale.petName || sale.client?.petName) && (
-                  <p className="text-xs text-gray-600">Pet: {sale.petName || sale.client?.petName}</p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-bold text-gray-600 mb-1">Payment</p>
-                <div className="inline-block bg-gray-100 px-2 py-0.5 rounded text-xs font-semibold text-[#002366]">
-                  {sale.payment || sale.paymentType || "Cash"}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <table className="w-full mb-4 text-xs">
-            <thead className="bg-linear-to-r from-[#002366] to-[#003a99] text-white">
-              <tr>
-                <th className="text-left p-2 font-bold">Item</th>
-                <th className="text-center p-2 font-bold">Qty</th>
-                <th className="text-right p-2 font-bold">Unit Price</th>
-                <th className="text-right p-2 font-bold">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sale.items && sale.items.length > 0 ? (
-                sale.items.map((item, idx: number) => (
-                  <tr key={idx} className="border-b hover:bg-gray-50">
-                    <td className="p-2 text-gray-900">{item.name}</td>
-                    <td className="p-2 text-center text-gray-900">{item.qty}</td>
-                    <td className="p-2 text-right text-gray-900">Rs. {item.price.toLocaleString()}</td>
-                    <td className="p-2 text-right font-semibold text-gray-900">Rs. {(item.qty * item.price).toLocaleString()}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} className="p-4 text-center text-gray-500">No items</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-
-          <div className="flex justify-end mb-3">
-            <div className="w-64">
-              <div className="flex justify-between py-1 border-b text-xs">
-                <span className="text-gray-700">Subtotal</span>
-                <span className="font-semibold text-gray-900">Rs. {safeSubtotal.toLocaleString()}</span>
-              </div>
-              {safeVat > 0 && (
-                <div className="flex justify-between py-1 border-b text-xs">
-                  <span className="text-gray-700">VAT (15%)</span>
-                  <span className="font-semibold text-gray-900">Rs. {safeVat.toLocaleString()}</span>
-                </div>
-              )}
-              {safeDiscount > 0 && (
-                <div className="flex justify-between py-1 border-b text-xs">
-                  <span className="text-gray-700">Discount</span>
-                  <span className="font-semibold text-red-600">- Rs. {safeDiscount.toLocaleString()}</span>
-                </div>
-              )}
-              <div className="flex justify-between py-2 bg-linear-to-r from-[#002366] to-[#003a99] text-white rounded mt-1 px-2 font-bold">
-                <span>TOTAL</span>
-                <span>Rs. {total.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-[#002366] pt-2 text-center text-xs text-gray-600">
-            <p className="mb-0.5">Thank you for your business!</p>
-            <p>Contact: {company.phone}</p>
-          </div>
-        </div>
+      {/* Format Info */}
+      <div className="max-w-4xl mx-auto mt-6 text-center text-sm text-gray-500">
+        <p>
+          <strong>Print Invoice (A4)</strong> - Full-size professional invoice for clients
+          <span className="mx-2">|</span>
+          <strong>Print Receipt (POS)</strong> - Compact receipt for thermal printers
+        </p>
       </div>
     </div>
   )
 }
-
-
-

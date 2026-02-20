@@ -314,7 +314,7 @@ export default function SalesReport() {
               variant="outline"
               onClick={fetchSummary}
               disabled={loading}
-              className="rounded-2xl border-white/60 text-white"
+              className="rounded-2xl border-white/80 bg-white/20 text-white hover:bg-white/30"
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh data
             </Button>
@@ -423,9 +423,9 @@ export default function SalesReport() {
                     <p className="font-semibold text-foreground">{method.paymentType}</p>
                     <p className="text-xs text-muted-foreground">{method.invoices} invoices</p>
                   </div>
-                  <p className="text-base font-bold text-white">{formatCurrency(method.amount)}</p>
+                  <p className="text-base font-bold text-foreground">{formatCurrency(method.amount)}</p>
                 </div>
-                <div className="h-2 w-full rounded-full bg-white/10">
+                <div className="h-2 w-full rounded-full bg-muted">
                   <div
                     className="h-2 rounded-full bg-linear-to-r from-sky-400 to-blue-600"
                     style={{ width: `${Math.min(100, Math.max(0, method.share ?? 0))}%` }}
@@ -444,13 +444,13 @@ export default function SalesReport() {
           <CardContent className="space-y-4">
             <div className="grid gap-3">
               {statusBreakdown.map((status) => (
-                <div key={status.status} className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3">
+                <div key={status.status} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-foreground">{status.status}</p>
                     <p className="text-xs text-muted-foreground">{status.invoices} invoices</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-white">{formatCurrency(status.amount)}</p>
+                    <p className="font-semibold text-foreground">{formatCurrency(status.amount)}</p>
                     <p className="text-xs text-muted-foreground">{(status.share ?? 0).toFixed(1)}% of revenue</p>
                   </div>
                 </div>
@@ -458,21 +458,21 @@ export default function SalesReport() {
               {!statusBreakdown.length && !loading && <p className="text-sm text-muted-foreground">No status data available.</p>}
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-              <div className="rounded-2xl bg-white/5 p-3">
+              <div className="rounded-2xl bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">Subtotal</p>
-                <p className="text-lg font-semibold text-white">{formatCurrency(summary.subtotalAmount)}</p>
+                <p className="text-lg font-semibold text-foreground">{formatCurrency(summary.subtotalAmount)}</p>
               </div>
-              <div className="rounded-2xl bg-white/5 p-3">
+              <div className="rounded-2xl bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">VAT</p>
-                <p className="text-lg font-semibold text-white">{formatCurrency(summary.vatAmount)}</p>
+                <p className="text-lg font-semibold text-foreground">{formatCurrency(summary.vatAmount)}</p>
               </div>
-              <div className="rounded-2xl bg-white/5 p-3">
+              <div className="rounded-2xl bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">Discounts</p>
-                <p className="text-lg font-semibold text-rose-300">{formatCurrency(summary.discountAmount)}</p>
+                <p className="text-lg font-semibold text-rose-600">{formatCurrency(summary.discountAmount)}</p>
               </div>
-              <div className="rounded-2xl bg-white/5 p-3">
+              <div className="rounded-2xl bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">Gross margin</p>
-                <p className="text-lg font-semibold text-emerald-300">{summary.grossMargin.toFixed(1)}%</p>
+                <p className="text-lg font-semibold text-emerald-600">{summary.grossMargin.toFixed(1)}%</p>
               </div>
             </div>
           </CardContent>
@@ -488,15 +488,15 @@ export default function SalesReport() {
           <CardContent className="space-y-3">
             {!topProducts.length && !loading && <p className="text-sm text-muted-foreground">No sale items for this window.</p>}
             {topProducts.map((product) => (
-              <div key={product.name} className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3">
+              <div key={product.name} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold text-foreground">{product.name}</p>
                   <p className="text-xs text-muted-foreground">{product.units} units</p>
                 </div>
                 <div className="text-right text-xs">
-                  <p className="text-base font-semibold text-white">{formatCurrency(product.revenue)}</p>
+                  <p className="text-base font-semibold text-foreground">{formatCurrency(product.revenue)}</p>
                   <p className="text-muted-foreground">COGS {formatCurrency(product.cost)}</p>
-                  <p className="text-emerald-300">Profit {formatCurrency(product.profit)}</p>
+                  <p className="text-emerald-600">Profit {formatCurrency(product.profit)}</p>
                 </div>
               </div>
             ))}
@@ -511,17 +511,17 @@ export default function SalesReport() {
           <CardContent className="space-y-2">
             {!dailyTrend.length && !loading && <p className="text-sm text-muted-foreground">No daily data yet.</p>}
             {dailyTrend.map((point) => (
-              <div key={point.date} className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3">
+              <div key={point.date} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
                 <div className="flex items-center gap-3">
-                  <span className="rounded-2xl bg-white/10 p-2">
-                    <BarChart3 className="h-4 w-4 text-white" />
+                  <span className="rounded-2xl bg-primary/10 p-2">
+                    <BarChart3 className="h-4 w-4 text-primary" />
                   </span>
                   <div>
                     <p className="text-sm font-semibold text-foreground">{formatDate(point.date)}</p>
                     <p className="text-xs text-muted-foreground">{point.invoices} invoices</p>
                   </div>
                 </div>
-                <p className="text-base font-semibold text-white">{formatCurrency(point.amount)}</p>
+                <p className="text-base font-semibold text-foreground">{formatCurrency(point.amount)}</p>
               </div>
             ))}
           </CardContent>
@@ -579,7 +579,7 @@ export default function SalesReport() {
                     <td className="py-3 px-4 font-semibold text-sky-400">{invoice.invoiceNo}</td>
                     <td className="py-3 px-4 text-sm text-foreground">{invoice.customer}</td>
                     <td className="py-3 px-4 text-center text-sm">{invoice.items}</td>
-                    <td className="py-3 px-4 text-right font-semibold text-white">{formatCurrency(invoice.total)}</td>
+                    <td className="py-3 px-4 text-right font-semibold text-foreground">{formatCurrency(invoice.total)}</td>
                     <td className="py-3 px-4 text-sm text-muted-foreground">{invoice.paymentType}</td>
                     <td className="py-3 px-4 text-right">
                       <Badge className={`${statusBadgeClass(invoice.status)} border`}>{invoice.status}</Badge>

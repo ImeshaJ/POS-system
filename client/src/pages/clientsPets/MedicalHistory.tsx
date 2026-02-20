@@ -712,7 +712,7 @@ export default function MedicalHistory() {
                 <th className="px-4 py-3">Age</th>
                 <th className="px-4 py-3">Weight</th>
                 <th className="px-4 py-3">Files</th>
-                <th className="px-4 py-3">Doctor</th>
+                <th className="px-4 py-3">Veterinarian</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-center">Actions</th>
               </tr>

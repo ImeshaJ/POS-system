@@ -303,7 +303,7 @@ export default function StockReport() {
             <Button onClick={downloadReport} className="rounded-2xl bg-white/90 px-5 py-2 text-[#0f172a] hover:bg-white" disabled={!visibleProducts.length}>
               <Download className="mr-2 h-4 w-4" /> Export CSV
             </Button>
-            <Button variant="outline" onClick={fetchSummary} disabled={loading} className="rounded-2xl border-white/60 text-white">
+            <Button variant="outline" onClick={fetchSummary} disabled={loading} className="rounded-2xl border-white/80 bg-white/20 text-white hover:bg-white/30">
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh data
             </Button>
           </div>
@@ -431,15 +431,15 @@ export default function StockReport() {
               <div key={category.category} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-white">{category.category}</p>
+                    <p className="font-semibold text-foreground">{category.category}</p>
                     <p className="text-xs text-muted-foreground">{formatUnits(category.skus)} SKU(s)</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-base font-semibold text-white">{formatUnits(category.units)} units</p>
+                    <p className="text-base font-semibold text-foreground">{formatUnits(category.units)} units</p>
                     <p className="text-xs text-muted-foreground">{formatCurrency(category.costValue)} cost</p>
                   </div>
                 </div>
-                <div className="h-2 w-full rounded-full bg-white/10">
+                <div className="h-2 w-full rounded-full bg-muted">
                   <div
                     className="h-2 rounded-full bg-linear-to-r from-sky-400 to-sky-600"
                     style={{ width: `${Math.min(100, Math.max(0, (category.units / totalCategoryUnits) * 100))}%` }}
@@ -461,12 +461,12 @@ export default function StockReport() {
               <div key={status.status} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-white capitalize">{status.status}</p>
+                    <p className="text-sm font-semibold text-foreground capitalize">{status.status}</p>
                     <p className="text-xs text-muted-foreground">{formatUnits(status.skus)} SKU(s)</p>
                   </div>
-                  <p className="text-sm font-semibold text-white">{formatUnits(status.units)} units</p>
+                  <p className="text-sm font-semibold text-foreground">{formatUnits(status.units)} units</p>
                 </div>
-                <div className="h-2 w-full rounded-full bg-white/10">
+                <div className="h-2 w-full rounded-full bg-muted">
                   <div
                     className={`h-2 rounded-full bg-linear-to-r ${statusGradientClass(status.status)}`}
                     style={{ width: `${Math.min(100, Math.max(0, (status.units / totalStatusUnits) * 100))}%` }}
@@ -487,12 +487,12 @@ export default function StockReport() {
           </CardHeader>
           <CardContent className="space-y-3">
             {lowStock.map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-2xl border border-amber-200/30 bg-amber-500/10 px-4 py-3">
+              <div key={item.id} className="flex items-center justify-between rounded-2xl border border-amber-200/30 bg-amber-50 px-4 py-3">
                 <div>
-                  <p className="font-semibold text-white">{item.name}</p>
+                  <p className="font-semibold text-foreground">{item.name}</p>
                   <p className="text-xs text-muted-foreground">Current {formatUnits(item.quantity)} - Min {formatUnits(item.reorderLevel || 0)}</p>
                 </div>
-                <Badge variant="outline" className="border-amber-400 text-amber-300">
+                <Badge variant="outline" className="border-amber-400 text-amber-600">
                   Reorder
                 </Badge>
               </div>
@@ -508,12 +508,12 @@ export default function StockReport() {
           </CardHeader>
           <CardContent className="space-y-3">
             {expiring.map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-2xl border border-rose-200/30 bg-rose-500/10 px-4 py-3">
+              <div key={item.id} className="flex items-center justify-between rounded-2xl border border-rose-200/30 bg-rose-50 px-4 py-3">
                 <div>
-                  <p className="font-semibold text-white">{item.name}</p>
+                  <p className="font-semibold text-foreground">{item.name}</p>
                   <p className="text-xs text-muted-foreground">Expires {formatDate(item.expiryDate)}</p>
                 </div>
-                <Badge variant="outline" className="border-rose-400 text-rose-300">
+                <Badge variant="outline" className="border-rose-400 text-rose-600">
                   Rotate stock
                 </Badge>
               </div>
@@ -561,10 +561,10 @@ export default function StockReport() {
             <tbody>
               {visibleProducts.map((item) => (
                 <tr key={item.id} className="border-b last:border-0">
-                  <td className="py-2 px-3 font-semibold text-white">{item.name}</td>
+                  <td className="py-2 px-3 font-semibold text-foreground">{item.name}</td>
                   <td className="py-2 px-3 text-sm text-muted-foreground">{item.code}</td>
                   <td className="py-2 px-3 text-sm text-muted-foreground">{item.category}</td>
-                  <td className="py-2 px-3 text-right font-semibold text-white">{formatUnits(item.quantity)}</td>
+                  <td className="py-2 px-3 text-right font-semibold text-foreground">{formatUnits(item.quantity)}</td>
                   <td className="py-2 px-3 text-right text-muted-foreground">{item.reorderLevel || "—"}</td>
                   <td className="py-2 px-3 text-sm text-muted-foreground">{item.supplier}</td>
                   <td className="py-2 px-3 text-sm text-muted-foreground">{formatDate(item.expiryDate)}</td>

@@ -13,16 +13,16 @@ import {
   ClipboardCheck,
   Download,
   Edit2,
+  FileText,
   Filter,
   Plus,
   Scale,
   ShieldCheck,
   Sparkles,
-  Stethoscope,
   Trash2,
   X,
 } from "lucide-react"
-import { apiDelete, apiGet } from "@/lib/api"
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api"
 import { useToast } from "@/components/common/Toast"
 import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 
@@ -39,6 +39,27 @@ interface AddonService {
   id: number
   name: string
   price: string
+}
+
+interface ApiServicePackage {
+  id: number
+  name: string
+  price: string
+  description: string | null
+  duration_days: number
+  duration_hours: number
+  duration_minutes: number
+  status: string
+  service_type_code: string
+}
+
+interface ApiAddOnService {
+  id: number
+  name: string
+  price: string
+  description: string | null
+  status: string
+  service_type_code: string
 }
 
 type AppointmentStatus = "Scheduled" | "Completed" | "Cancelled" | "No-Show"
@@ -76,7 +97,26 @@ type CaseDetail = {
   recoveryPlan: string
 }
 
+interface ApiSurgeryCase {
+  id: number
+  appointment_id: number
+  fasting_confirmed: boolean
+  bloodwork_done: boolean
+  consent_signed: boolean
+  implants_ready: boolean
+  notes: string | null
+  anesthesia_plan: string | null
+  recovery_plan: string | null
+}
+
 type CaseChecklistKey = keyof Pick<CaseDetail, "fastingConfirmed" | "bloodworkDone" | "consentSigned" | "implantsReady">
+
+interface SurgeryHistoryEntry {
+  caseId: string
+  surgeryCase: SurgeryCase
+  detail: CaseDetail
+  updatedAt: number
+}
 
 const SURGERY_KEYWORDS = ["surgery", "spay", "neuter", "repair", "hernia", "orthopedic", "mass removal"]
 const SURGERY_STATUS_BADGE: Record<AppointmentStatus, string> = {
@@ -190,6 +230,9 @@ export default function SurgeryServices() {
   const [selectedCase, setSelectedCase] = useState<SurgeryCase | null>(null)
   const [detailForm, setDetailForm] = useState<CaseDetail>(createDefaultDetail())
   const [detailSaving, setDetailSaving] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [surgeryCaseId, setSurgeryCaseId] = useState<number | null>(null)
+  const [surgeryHistory, setSurgeryHistory] = useState<SurgeryHistoryEntry[]>([])
 
   const surgeryKeywords = useMemo(() => SURGERY_KEYWORDS.map((item) => item.toLowerCase()), [])
 
@@ -211,9 +254,44 @@ export default function SurgeryServices() {
     }
   }, [surgeryKeywords])
 
+  const fetchPackages = useCallback(async () => {
+    try {
+      const res = await apiGet<ApiServicePackage[]>("/api/service-types/packages/by-type/surgery")
+      if (res.data.length > 0) {
+        setPackages(res.data.map(pkg => ({
+          id: pkg.id,
+          name: pkg.name,
+          priceRange: `Rs. ${parseFloat(pkg.price).toLocaleString()}`,
+          description: pkg.description || "",
+          length: pkg.duration_hours ? `${pkg.duration_hours} hrs` : pkg.duration_minutes ? `${pkg.duration_minutes} mins` : "As required",
+          active: pkg.status === "active"
+        })))
+      }
+    } catch {
+      // Use default packages if API fails
+    }
+  }, [])
+
+  const fetchAddOnServices = useCallback(async () => {
+    try {
+      const res = await apiGet<ApiAddOnService[]>("/api/service-types/addons/by-type/surgery")
+      if (res.data.length > 0) {
+        setAddons(res.data.map(addon => ({
+          id: addon.id,
+          name: addon.name,
+          price: `Rs. ${parseFloat(addon.price).toLocaleString()}`
+        })))
+      }
+    } catch {
+      // Use default services if API fails
+    }
+  }, [])
+
   useEffect(() => {
     fetchAppointments()
-  }, [fetchAppointments])
+    fetchPackages()
+    fetchAddOnServices()
+  }, [fetchAppointments, fetchPackages, fetchAddOnServices])
 
   const totalCases = appointmentRecords.length
   const upcomingCount = useMemo(() => {
@@ -370,29 +448,105 @@ export default function SurgeryServices() {
     }
   }
 
-  const openCaseDetail = (record: SurgeryCase) => {
+  const openCaseDetail = async (record: SurgeryCase) => {
     setSelectedCase(record)
-    setDetailForm(caseDetails[record.id] ?? createDefaultDetail())
+    setDetailForm(createDefaultDetail())
+    setSurgeryCaseId(null)
+    setDetailLoading(true)
+
+    try {
+      const res = await apiGet<ApiSurgeryCase>(`/api/services-extension/surgery-cases/by-appointment/${record.id}`)
+      const data = res.data
+      setSurgeryCaseId(data.id)
+      setDetailForm({
+        fastingConfirmed: data.fasting_confirmed ?? false,
+        bloodworkDone: data.bloodwork_done ?? false,
+        consentSigned: data.consent_signed ?? false,
+        implantsReady: data.implants_ready ?? false,
+        notes: data.notes ?? "",
+        anesthesiaPlan: data.anesthesia_plan ?? "",
+        recoveryPlan: data.recovery_plan ?? "",
+      })
+      setCaseDetails((prev) => ({
+        ...prev,
+        [record.id]: {
+          fastingConfirmed: data.fasting_confirmed ?? false,
+          bloodworkDone: data.bloodwork_done ?? false,
+          consentSigned: data.consent_signed ?? false,
+          implantsReady: data.implants_ready ?? false,
+          notes: data.notes ?? "",
+          anesthesiaPlan: data.anesthesia_plan ?? "",
+          recoveryPlan: data.recovery_plan ?? "",
+        },
+      }))
+    } catch {
+      // No existing surgery case, use default form or cached details
+      setDetailForm(caseDetails[record.id] ?? createDefaultDetail())
+    } finally {
+      setDetailLoading(false)
+    }
   }
 
   const closeCaseDetail = () => {
     setSelectedCase(null)
     setDetailForm(createDefaultDetail())
     setDetailSaving(false)
+    setSurgeryCaseId(null)
   }
 
   const updateDetailField = <K extends keyof CaseDetail>(key: K, value: CaseDetail[K]) => {
     setDetailForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const saveCaseDetail = () => {
+  const saveCaseDetail = async () => {
     if (!selectedCase) return
     setDetailSaving(true)
-    setCaseDetails((prev) => ({ ...prev, [selectedCase.id]: detailForm }))
-    setTimeout(() => {
-      setDetailSaving(false)
+
+    const payload = {
+      appointment_id: Number(selectedCase.id),
+      fasting_confirmed: detailForm.fastingConfirmed,
+      bloodwork_done: detailForm.bloodworkDone,
+      consent_signed: detailForm.consentSigned,
+      implants_ready: detailForm.implantsReady,
+      notes: detailForm.notes,
+      anesthesia_plan: detailForm.anesthesiaPlan,
+      recovery_plan: detailForm.recoveryPlan,
+    }
+
+    try {
+      if (surgeryCaseId) {
+        // Update existing surgery case
+        await apiPut(`/api/services-extension/surgery-cases/${surgeryCaseId}`, payload)
+        toast.success("Surgery case details updated successfully")
+      } else {
+        // Create new surgery case
+        const res = await apiPost<ApiSurgeryCase>("/api/services-extension/surgery-cases", payload)
+        setSurgeryCaseId(res.data.id)
+        toast.success("Surgery case details saved successfully")
+      }
+      setCaseDetails((prev) => ({ ...prev, [selectedCase.id]: detailForm }))
+      // Update surgery history
+      setSurgeryHistory((prev) => {
+        const entry: SurgeryHistoryEntry = {
+          caseId: selectedCase.id,
+          surgeryCase: selectedCase,
+          detail: detailForm,
+          updatedAt: Date.now(),
+        }
+        const index = prev.findIndex((item) => item.caseId === selectedCase.id)
+        if (index === -1) {
+          return [entry, ...prev]
+        }
+        const clone = [...prev]
+        clone[index] = entry
+        return clone
+      })
       closeCaseDetail()
-    }, 250)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save surgery case details")
+    } finally {
+      setDetailSaving(false)
+    }
   }
 
   const resetFilters = () => {
@@ -554,7 +708,7 @@ export default function SurgeryServices() {
               <Label className="text-xs uppercase text-muted-foreground">Search</Label>
               <Input
                 className="mt-1 rounded-2xl"
-                placeholder="Pet, client, doctor, or procedure"
+                placeholder="Pet, client, veterinarian, or procedure"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
@@ -607,7 +761,7 @@ export default function SurgeryServices() {
                   <TableHead>Date</TableHead>
                   <TableHead>Pet / Client</TableHead>
                   <TableHead>Procedure</TableHead>
-                  <TableHead>Doctor</TableHead>
+                  <TableHead>Veterinarian</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -632,13 +786,20 @@ export default function SurgeryServices() {
                         {record.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button size="sm" variant="ghost" onClick={() => openCaseDetail(record)}>
-                        <Stethoscope className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => handleDeleteCaseClick(record.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => openCaseDetail(record)} className="rounded-2xl">
+                          Manage
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="rounded-2xl text-rose-600 hover:text-rose-700"
+                          onClick={() => handleDeleteCaseClick(record.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -657,79 +818,83 @@ export default function SurgeryServices() {
 
       <Card className="brand-card brand-card-hover">
         <CardHeader>
-          <div className="flex items-center gap-3">
-            <span className="rounded-2xl bg-emerald-50 p-2 text-emerald-700">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            <div>
-              <CardTitle>Pre / Post-op Checklist</CardTitle>
-              <CardDescription>Make sure no patient enters or exits OR without the essentials.</CardDescription>
-            </div>
-          </div>
+          <CardTitle>Surgery history</CardTitle>
+          <CardDescription>Saved surgical checklists and perioperative notes.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            {CASE_BOOLEAN_CHECKS.map((item) => (
-              <label key={item.key} className="flex items-center gap-3 rounded-2xl border border-dashed border-border/60 px-4 py-3 text-sm">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-border"
-                  checked={detailForm[item.key]}
-                  onChange={(event) => updateDetailField(item.key, event.target.checked)}
-                  disabled={!selectedCase}
-                />
-                {item.label}
-              </label>
-            ))}
-          </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <div>
-              <Label className="text-sm font-medium">Anesthesia plan</Label>
-              <Input
-                className="mt-1"
-                placeholder="Induction, maintenance, monitoring"
-                value={detailForm.anesthesiaPlan}
-                onChange={(event) => updateDetailField("anesthesiaPlan", event.target.value)}
-                disabled={!selectedCase}
-              />
+          {surgeryHistory.length ? (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {surgeryHistory.map(({ caseId, surgeryCase, detail }) => {
+                const completedChecks = CASE_BOOLEAN_CHECKS.filter(({ key }) => detail[key])
+                return (
+                  <div key={caseId} className="rounded-2xl border border-blue-100 bg-white shadow-sm transition hover:shadow-md">
+                    <div className="space-y-3 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="rounded-xl bg-blue-50 p-3 text-blue-600">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="font-semibold text-foreground">{surgeryCase.patient}</p>
+                              <p className="text-sm text-muted-foreground">{surgeryCase.client}</p>
+                            </div>
+                            <Badge className={`${SURGERY_STATUS_BADGE[surgeryCase.status]} border`}>{surgeryCase.status}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {surgeryCase.date || "Date TBD"} · {surgeryCase.time || "—"} · {surgeryCase.doctor}
+                          </p>
+                          {surgeryCase.reason && <p className="text-xs text-muted-foreground">Procedure: {surgeryCase.reason}</p>}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {completedChecks.length ? (
+                          completedChecks.map(({ key, label }) => (
+                            <span
+                              key={key}
+                              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800"
+                            >
+                              ✓ {label}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No checklist updates yet.</span>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 text-sm text-foreground">
+                        <div>
+                          <p className="text-xs uppercase text-gray-400">Anesthesia plan</p>
+                          <p className={`mt-1 whitespace-pre-line ${detail.anesthesiaPlan ? "text-foreground" : "text-muted-foreground"}`}>
+                            {detail.anesthesiaPlan || "Pending"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase text-gray-400">Recovery plan</p>
+                          <p className={`mt-1 whitespace-pre-line ${detail.recoveryPlan ? "text-foreground" : "text-muted-foreground"}`}>
+                            {detail.recoveryPlan || "Pending"}
+                          </p>
+                        </div>
+                        {detail.notes && (
+                          <div>
+                            <p className="text-xs uppercase text-gray-400">Notes</p>
+                            <p className="mt-1 whitespace-pre-line text-foreground">{detail.notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="border-t bg-blue-50/60 px-4 py-3 text-right">
+                      <Button size="sm" variant="outline" onClick={() => openCaseDetail(surgeryCase)} className="rounded-2xl">
+                        Update
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-            <div>
-              <Label className="text-sm font-medium">Recovery plan</Label>
-              <Input
-                className="mt-1"
-                placeholder="Analgesia, temperature, discharge"
-                value={detailForm.recoveryPlan}
-                onChange={(event) => updateDetailField("recoveryPlan", event.target.value)}
-                disabled={!selectedCase}
-              />
-            </div>
-            <div>
-              <Label className="text-sm font-medium">Notes</Label>
-              <Input
-                className="mt-1"
-                placeholder="Implants, owner preferences, risks"
-                value={detailForm.notes}
-                onChange={(event) => updateDetailField("notes", event.target.value)}
-                disabled={!selectedCase}
-              />
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button
-              className="rounded-2xl"
-              disabled={!selectedCase || detailSaving}
-              onClick={saveCaseDetail}
-            >
-              {detailSaving ? "Saving..." : "Save detail"}
-            </Button>
-            <Button variant="ghost" className="rounded-2xl" disabled={!selectedCase} onClick={closeCaseDetail}>
-              Close panel
-            </Button>
-          </div>
-          {!selectedCase && (
-            <p className="mt-4 text-sm text-muted-foreground">
-              Select a surgery from the OR ledger to populate this checklist.
-            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Save a surgery checklist to populate history cards.</p>
           )}
         </CardContent>
       </Card>
@@ -749,6 +914,125 @@ export default function SurgeryServices() {
             {appointmentError}
           </CardContent>
         </Card>
+      )}
+
+      {/* Surgery Case Detail Modal */}
+      {selectedCase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl">
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div>
+                <CardTitle>Surgery case checklist</CardTitle>
+                <CardDescription>
+                  {selectedCase.patient} · {selectedCase.client} · {selectedCase.reason}
+                </CardDescription>
+              </div>
+              <button className="text-2xl text-muted-foreground hover:text-foreground" onClick={closeCaseDetail}>
+                ✕
+              </button>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {detailLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader />
+                </div>
+              ) : (
+                <>
+                  {/* Pre-operative Checklist */}
+                  <div>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">Pre-operative checklist</h3>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      {CASE_BOOLEAN_CHECKS.map(({ key, label }) => (
+                        <label
+                          key={key}
+                          className="flex items-center gap-2 rounded-2xl border border-gray-200 p-3 text-sm font-semibold text-foreground"
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={detailForm[key] as boolean}
+                            onChange={(event) => updateDetailField(key, event.target.checked as CaseDetail[typeof key])}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Surgery Details */}
+                  <div>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">Surgery details</h3>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div>
+                        <Label>Anesthesia plan</Label>
+                        <textarea
+                          className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                          rows={3}
+                          placeholder="Induction protocol, maintenance, monitoring parameters"
+                          value={detailForm.anesthesiaPlan}
+                          onChange={(event) => updateDetailField("anesthesiaPlan", event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label>Recovery plan</Label>
+                        <textarea
+                          className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                          rows={3}
+                          placeholder="Post-op analgesia, temperature monitoring, discharge criteria"
+                          value={detailForm.recoveryPlan}
+                          onChange={(event) => updateDetailField("recoveryPlan", event.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes Section */}
+                  <div>
+                    <Label>Additional notes</Label>
+                    <textarea
+                      className="mt-2 w-full rounded-2xl border border-gray-300 p-3 text-sm"
+                      rows={4}
+                      placeholder="Implants used, special equipment, owner instructions, complications, risks discussed"
+                      value={detailForm.notes}
+                      onChange={(event) => updateDetailField("notes", event.target.value)}
+                    />
+                  </div>
+
+                  {/* Case Info */}
+                  <div className="rounded-2xl bg-muted/50 p-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-xs uppercase text-muted-foreground">Scheduled</p>
+                        <p className="font-semibold text-foreground">{selectedCase.date || "TBD"} · {selectedCase.time || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase text-muted-foreground">Surgeon</p>
+                        <p className="font-semibold text-foreground">{selectedCase.doctor}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase text-muted-foreground">Status</p>
+                        <Badge className={`${SURGERY_STATUS_BADGE[selectedCase.status]} border mt-1`}>{selectedCase.status}</Badge>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase text-muted-foreground">Record</p>
+                        <p className="font-semibold text-foreground">{surgeryCaseId ? `ID: ${surgeryCaseId}` : "New case"}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={closeCaseDetail} className="rounded-2xl">
+                      Cancel
+                    </Button>
+                    <Button onClick={saveCaseDetail} disabled={detailSaving} className="rounded-2xl bg-[#0f172a] text-white">
+                      {detailSaving ? "Saving…" : "Save details"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {(showPackageModal || showAddonModal) && (

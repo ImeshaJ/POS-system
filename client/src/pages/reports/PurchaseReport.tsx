@@ -56,6 +56,13 @@ type PurchaseRow = {
   status: string
   items: number
   total: number
+  staffId: number | null
+  staffName: string
+}
+
+type StaffOption = {
+  id: number
+  username: string
 }
 
 type PurchaseSummaryResponse = {
@@ -80,6 +87,7 @@ type PurchaseFilters = {
   startDate: string
   endDate: string
   status: PurchaseStatusFilter
+  staffId: string
 }
 
 const STATUS_OPTIONS: Array<{ label: string; value: PurchaseStatusFilter }> = [
@@ -119,7 +127,7 @@ const statusBadgeClass = (status: string) => {
 }
 
 export default function PurchaseReport() {
-  const [filters, setFilters] = useState<PurchaseFilters>({ startDate: "", endDate: "", status: "all" })
+  const [filters, setFilters] = useState<PurchaseFilters>({ startDate: "", endDate: "", status: "all", staffId: "" })
   const [searchTerm, setSearchTerm] = useState("")
   const [summary, setSummary] = useState<PurchaseSummaryMetrics>(() => createEmptySummary())
   const [statusBreakdown, setStatusBreakdown] = useState<StatusStat[]>([])
@@ -128,8 +136,18 @@ export default function PurchaseReport() {
   const [trend, setTrend] = useState<TrendPoint[]>([])
   const [purchases, setPurchases] = useState<PurchaseRow[]>([])
   const [outstandingDue, setOutstandingDue] = useState(0)
+  const [staffOptions, setStaffOptions] = useState<StaffOption[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+
+  const fetchStaffOptions = useCallback(async () => {
+    try {
+      const res = await apiGet<StaffOption[]>("/api/purchases/staff")
+      setStaffOptions(res.data ?? [])
+    } catch {
+      // Silently fail - staff options are optional
+    }
+  }, [])
 
   const fetchSummary = useCallback(async () => {
     setLoading(true)
@@ -139,6 +157,7 @@ export default function PurchaseReport() {
       if (filters.startDate) params.append("startDate", filters.startDate)
       if (filters.endDate) params.append("endDate", filters.endDate)
       if (filters.status !== "all") params.append("status", filters.status)
+      if (filters.staffId) params.append("staffId", filters.staffId)
       const query = params.toString() ? `?${params.toString()}` : ""
       const res = await apiGet<PurchaseSummaryResponse>(`/api/purchases/summary${query}`)
       const payload = res.data
@@ -155,6 +174,10 @@ export default function PurchaseReport() {
       setLoading(false)
     }
   }, [filters])
+
+  useEffect(() => {
+    fetchStaffOptions()
+  }, [fetchStaffOptions])
 
   useEffect(() => {
     fetchSummary()
@@ -179,7 +202,7 @@ export default function PurchaseReport() {
     const csvContent = [
       ["Purchase Report - " + new Date().toLocaleDateString()],
       [],
-      ["Date", "Invoice", "Supplier", "Items", "Amount (Rs.)", "Status"],
+      ["Date", "Invoice", "Supplier", "Items", "Amount (Rs.)", "Status", "Purchased By"],
       ...visiblePurchases.map((row) => [
         formatDate(row.date),
         row.invoiceNo,
@@ -187,6 +210,7 @@ export default function PurchaseReport() {
         row.items,
         Math.round(row.total).toLocaleString(),
         row.status,
+        row.staffName,
       ]),
       [],
       ["Total Orders", summary.purchaseCount],
@@ -206,7 +230,7 @@ export default function PurchaseReport() {
     window.URL.revokeObjectURL(url)
   }
 
-  const resetFilters = () => setFilters({ startDate: "", endDate: "", status: "all" })
+  const resetFilters = () => setFilters({ startDate: "", endDate: "", status: "all", staffId: "" })
 
   const heroMetrics = [
     {
@@ -239,6 +263,12 @@ export default function PurchaseReport() {
     },
   ]
 
+  const getStaffFilterLabel = () => {
+    if (!filters.staffId) return "All staff"
+    const staff = staffOptions.find((s) => String(s.id) === filters.staffId)
+    return staff?.username || "Selected staff"
+  }
+
   const highlightStats = [
     {
       label: "Status filter",
@@ -251,9 +281,9 @@ export default function PurchaseReport() {
       accent: "text-emerald-500",
     },
     {
-      label: "Ledger search",
-      value: searchTerm ? `"${searchTerm}"` : "All purchases",
-      accent: "text-rose-500",
+      label: "Purchased by",
+      value: getStaffFilterLabel(),
+      accent: "text-violet-500",
     },
     {
       label: "Dues monitored",
@@ -297,7 +327,7 @@ export default function PurchaseReport() {
               variant="outline"
               onClick={fetchSummary}
               disabled={loading}
-              className="rounded-2xl border-white/60 text-white"
+              className="rounded-2xl border-white/80 bg-white/20 text-white hover:bg-white/30"
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh data
             </Button>
@@ -360,6 +390,24 @@ export default function PurchaseReport() {
               </div>
             </div>
           </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-foreground">Purchased By</Label>
+              <Select value={filters.staffId} onValueChange={(value) => setFilters((prev) => ({ ...prev, staffId: value === "all" ? "" : value }))}>
+                <SelectTrigger className="h-11 rounded-2xl">
+                  <SelectValue placeholder="All staff" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All staff</SelectItem>
+                  {staffOptions.map((staff) => (
+                    <SelectItem key={staff.id} value={String(staff.id)}>
+                      {staff.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="grid gap-3 lg:grid-cols-[auto_auto_1fr]">
             <Button variant="outline" onClick={resetFilters} disabled={loading} className="h-11 rounded-2xl border-dashed">
               Reset filters
@@ -394,12 +442,12 @@ export default function PurchaseReport() {
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div>
             <p className="text-sm text-muted-foreground">Outstanding dues</p>
-            <p className="text-3xl font-bold text-white">{formatCurrency(outstandingDue)}</p>
+            <p className="text-3xl font-bold text-foreground">{formatCurrency(outstandingDue)}</p>
             <p className="text-xs text-muted-foreground">Sum of supplier statements.</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Month cadence</p>
-            <p className="text-3xl font-bold text-white">{formatNumber(summary.purchaseCount || 0)} orders</p>
+            <p className="text-3xl font-bold text-foreground">{formatNumber(summary.purchaseCount || 0)} orders</p>
             <p className="text-xs text-muted-foreground">Refresh after receiving new GRNs.</p>
           </div>
         </CardContent>
@@ -424,8 +472,8 @@ export default function PurchaseReport() {
               <tbody>
                 {categoryBreakdown.map((category) => (
                   <tr key={category.category} className="border-b last:border-0">
-                    <td className="py-2 px-3 font-medium text-white">{category.category}</td>
-                    <td className="py-2 px-3 text-right text-emerald-300">{formatCurrency(category.spend)}</td>
+                    <td className="py-2 px-3 font-medium text-foreground">{category.category}</td>
+                    <td className="py-2 px-3 text-right text-emerald-600">{formatCurrency(category.spend)}</td>
                     <td className="py-2 px-3 text-center text-muted-foreground">{category.units}</td>
                     <td className="py-2 px-3 text-right text-muted-foreground">{category.share.toFixed(1)}%</td>
                   </tr>
@@ -452,15 +500,15 @@ export default function PurchaseReport() {
               <div key={status.status} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-white capitalize">{status.status}</p>
+                    <p className="text-sm font-semibold text-foreground capitalize">{status.status}</p>
                     <p className="text-xs text-muted-foreground">{formatNumber(status.purchases)} orders</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-white">{formatCurrency(status.amount)}</p>
+                    <p className="font-semibold text-foreground">{formatCurrency(status.amount)}</p>
                     <p className="text-xs text-muted-foreground">{status.share.toFixed(1)}% of spend</p>
                   </div>
                 </div>
-                <div className="h-2 w-full rounded-full bg-white/10">
+                <div className="h-2 w-full rounded-full bg-muted">
                   <div
                     className="h-2 rounded-full bg-linear-to-r from-amber-400 to-amber-600"
                     style={{ width: `${Math.min(100, Math.max(0, status.share))}%` }}
@@ -481,12 +529,12 @@ export default function PurchaseReport() {
           </CardHeader>
           <CardContent className="space-y-3">
             {topSuppliers.map((supplier) => (
-              <div key={`${supplier.id}-${supplier.name}`} className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3">
+              <div key={`${supplier.id}-${supplier.name}`} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
                 <div>
-                  <p className="font-semibold text-white">{supplier.name}</p>
+                  <p className="font-semibold text-foreground">{supplier.name}</p>
                   <p className="text-xs text-muted-foreground">{formatNumber(supplier.orders)} order(s)</p>
                 </div>
-                <p className="text-base font-bold text-amber-300">{formatCurrency(supplier.totalSpent)}</p>
+                <p className="text-base font-bold text-amber-600">{formatCurrency(supplier.totalSpent)}</p>
               </div>
             ))}
             {!topSuppliers.length && <p className="text-sm text-muted-foreground">No supplier activity yet.</p>}
@@ -500,12 +548,12 @@ export default function PurchaseReport() {
           </CardHeader>
           <CardContent className="space-y-2">
             {trend.slice(-8).map((point) => (
-              <div key={`${point.date}-${point.amount}`} className="flex items-center justify-between rounded-2xl border border-white/10 px-4 py-3">
+              <div key={`${point.date}-${point.amount}`} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
                 <div>
-                  <p className="text-sm font-semibold text-white">{formatDate(point.date)}</p>
+                  <p className="text-sm font-semibold text-foreground">{formatDate(point.date)}</p>
                   <p className="text-xs text-muted-foreground">{formatNumber(point.purchases)} order(s)</p>
                 </div>
-                <p className="text-base font-semibold text-emerald-300">{formatCurrency(point.amount)}</p>
+                <p className="text-base font-semibold text-emerald-600">{formatCurrency(point.amount)}</p>
               </div>
             ))}
             {!trend.length && <p className="text-sm text-muted-foreground">No trend data for this window.</p>}
@@ -545,24 +593,26 @@ export default function PurchaseReport() {
                 <th className="py-2 px-3 text-center font-semibold">Items</th>
                 <th className="py-2 px-3 text-right font-semibold">Amount</th>
                 <th className="py-2 px-3 text-center font-semibold">Status</th>
+                <th className="py-2 px-3 text-left font-semibold">Purchased By</th>
               </tr>
             </thead>
             <tbody>
               {visiblePurchases.map((row) => (
                 <tr key={row.id} className="border-b last:border-0">
                   <td className="py-2 px-3 text-sm text-muted-foreground">{formatDate(row.date)}</td>
-                  <td className="py-2 px-3 font-semibold text-white">{row.invoiceNo}</td>
+                  <td className="py-2 px-3 font-semibold text-sky-600">{row.invoiceNo}</td>
                   <td className="py-2 px-3 text-sm text-foreground">{row.supplier}</td>
                   <td className="py-2 px-3 text-center">{row.items}</td>
-                  <td className="py-2 px-3 text-right font-semibold text-white">{formatCurrency(row.total)}</td>
+                  <td className="py-2 px-3 text-right font-semibold text-foreground">{formatCurrency(row.total)}</td>
                   <td className="py-2 px-3 text-center">
                     <Badge variant="outline" className={`${statusBadgeClass(row.status)} border`}>{row.status}</Badge>
                   </td>
+                  <td className="py-2 px-3 text-sm text-foreground">{row.staffName}</td>
                 </tr>
               ))}
               {!visiblePurchases.length && (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
+                  <td colSpan={7} className="py-6 text-center text-sm text-muted-foreground">
                     No purchases match this search.
                   </td>
                 </tr>

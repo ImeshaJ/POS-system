@@ -20,6 +20,7 @@ import SalesReceipt80mm from "@/pages/sales/SalesReceipt80mm"
 import NewPurchase from "@/pages/purchases/NewPurchase"
 import PurchaseAddProduct from "@/pages/purchases/AddProduct"
 import PurchaseList from "@/pages/purchases/PurchaseList"
+import PurchaseDetail from "@/pages/purchases/PurchaseDetail"
 import PurchaseReturn from "@/pages/purchases/PurchaseReturn"
 import LowStock from "@/pages/purchases/LowStock"
 import ExpiryAlerts from "@/pages/purchases/ExpiryAlerts"
@@ -82,7 +83,7 @@ function AppRoutes() {
 							
 							<Route path="/purchases/new" element={<NewPurchase />} />
 							<Route path="/purchases/add" element={<PurchaseAddProduct />} />
-						
+							<Route path="/purchases/:id" element={<PurchaseDetail />} />
 							<Route path="/purchases/list" element={<PurchaseList />} />
 							
 							<Route path="/purchases/return" element={<PurchaseReturn />} />

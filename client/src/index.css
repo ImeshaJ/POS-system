@@ -147,6 +147,15 @@ html {
     outline: none !important;
     box-shadow: none !important;
   }
+  html, body {
+    cursor: default;
+  }
+  a, button, [role="button"], label[for], input[type="checkbox"], input[type="radio"], select, summary {
+    cursor: pointer;
+  }
+  input:not([type="checkbox"]):not([type="radio"]), textarea {
+    cursor: text;
+  }
   input:focus, textarea:focus, select:focus, button:focus {
     outline: none !important;
     box-shadow: none !important;
